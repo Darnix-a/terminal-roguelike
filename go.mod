@@ -1,6 +1,6 @@
 module terminal-roguelike
 
-go 1.27.1
+go 1.22
 
 require (
 	github.com/gdamore/encoding v1.0.1 // indirect
