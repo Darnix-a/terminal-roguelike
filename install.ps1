@@ -14,7 +14,7 @@ try {
     $ReleaseInfo = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
     $Tag = $ReleaseInfo.tag_name
 } catch {
-    $Tag = "v1.0.0"
+    $Tag = "v1.0.2"
 }
 
 $Arch = "amd64"

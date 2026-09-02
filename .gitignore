@@ -1,6 +1,6 @@
 # Binaries
-roguelike
-roguelike.exe
+/roguelike
+/roguelike.exe
 dist/
 
 # IDE / System
