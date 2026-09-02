@@ -1,0 +1,10 @@
+# Binaries
+roguelike
+roguelike.exe
+dist/
+
+# IDE / System
+.DS_Store
+.idea/
+.vscode/
+*.swp

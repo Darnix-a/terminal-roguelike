@@ -1,0 +1,630 @@
+package engine
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+
+	"github.com/gdamore/tcell/v2"
+
+	"terminal-roguelike/pkg/combat"
+	"terminal-roguelike/pkg/entities"
+	"terminal-roguelike/pkg/items"
+	"terminal-roguelike/pkg/mapgen"
+)
+
+type GameState int
+
+const (
+	StatePlaying GameState = iota
+	StateInventory
+	StateCombat
+	StateGameOver
+	StateVictory
+)
+
+type Game struct {
+	State            GameState
+	Map              *mapgen.DungeonMap
+	Player           *entities.Player
+	Monsters         []*entities.Monster
+	Items            []*items.Item
+	Floor            int
+	MaxFloors        int
+	TurnCount        int
+	Log              *MessageLog
+	RNG              *rand.Rand
+	FOVRadius        int
+	InventoryIdx     int
+	MapW             int
+	MapH             int
+	ActiveBattle     *combat.Battle
+	LastPlayerX      int
+	LastPlayerY      int
+	TutorialTriggers map[string]bool
+}
+
+func NewGame(mapW, mapH int) *Game {
+	if mapW < 50 {
+		mapW = 70
+	}
+	if mapH < 18 {
+		mapH = 22
+	}
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	g := &Game{
+		State:            StatePlaying,
+		Floor:            0,
+		MaxFloors:        5,
+		TurnCount:        0,
+		Log:              NewMessageLog(100),
+		RNG:              rng,
+		FOVRadius:        8,
+		InventoryIdx:     0,
+		MapW:             mapW,
+		MapH:             mapH,
+		TutorialTriggers: make(map[string]bool),
+	}
+
+	g.generateFloor(0)
+	return g
+}
+
+func (g *Game) generateFloor(floor int) {
+	g.Floor = floor
+	g.Monsters = make([]*entities.Monster, 0)
+	g.Items = make([]*items.Item, 0)
+
+	if floor == 0 {
+		// Handcrafted Dynamic Tutorial Floor
+		g.Map = mapgen.GenerateTutorial(g.MapW, g.MapH)
+
+		if g.Player == nil {
+			g.Player = entities.NewPlayer(g.Map.StartX, g.Map.StartY)
+		} else {
+			g.Player.MoveTo(g.Map.StartX, g.Map.StartY)
+		}
+
+		if len(g.Map.Rooms) >= 2 {
+			r2 := g.Map.Rooms[1]
+			cx, cy := r2.Center()
+			g.Items = append(g.Items, items.NewDagger(cx-1, cy-1))
+			g.Items = append(g.Items, items.NewLeatherArmor(cx+1, cy-1))
+			g.Items = append(g.Items, items.NewHealthPotion(cx-1, cy+1))
+			g.Items = append(g.Items, items.NewGold(cx+1, cy+1, 50))
+		}
+
+		if len(g.Map.Rooms) >= 3 {
+			r3 := g.Map.Rooms[2]
+			cx, cy := r3.Center()
+			trainingDummy := entities.NewGoblin(cx, cy)
+			trainingDummy.Name = "Training Goblin"
+			trainingDummy.HP = 10
+			trainingDummy.MaxHP = 10
+			trainingDummy.ATK = 3
+			g.Monsters = append(g.Monsters, trainingDummy)
+		}
+
+		g.Log.Add("=== TUTORIAL: TRAINING GROUNDS ===", tcell.ColorGold)
+		g.Log.Add("You are '@'. Move with WASD or Arrow Keys. Darkness reveals as you walk.", tcell.ColorYellow)
+		g.Log.Add("Explore the chambers to your right to learn the basics!", tcell.ColorLightCyan)
+
+	} else {
+		// Procedural Dungeon Floors (1 to 5)
+		g.Map = mapgen.Generate(g.MapW, g.MapH, 14, 5, 10, g.RNG)
+
+		if g.Player == nil {
+			g.Player = entities.NewPlayer(g.Map.StartX, g.Map.StartY)
+		} else {
+			g.Player.MoveTo(g.Map.StartX, g.Map.StartY)
+		}
+
+		g.Log.Add(fmt.Sprintf("=== ENTERED DUNGEON FLOOR %d ===", floor), tcell.ColorGold)
+		if floor == g.MaxFloors {
+			g.Log.Add("WARNING: THE ANCIENT RED DRAGON LAIRS ON THIS FLOOR!", tcell.ColorRed)
+		}
+
+		// Designate 1 room as a Locked Vault on Floors 1-5
+		vaultRoomIdx := -1
+		if len(g.Map.Rooms) > 3 {
+			vaultRoomIdx = g.RNG.Intn(len(g.Map.Rooms)-2) + 1
+			vRoom := g.Map.Rooms[vaultRoomIdx]
+			vx, vy := vRoom.Center()
+
+			// Place a Locked Door '%' at entrance
+			g.Map.Tiles[vRoom.X1][vy] = mapgen.NewDoorLocked()
+
+			// Place 1-2 Treasure Chests inside Vault
+			g.Map.Tiles[vx][vy] = mapgen.NewChest()
+
+			// Place a Fountain or Shrine inside Vault
+			if g.RNG.Intn(2) == 0 {
+				g.Map.Tiles[vx+1][vy] = mapgen.NewFountain()
+			} else {
+				g.Map.Tiles[vx+1][vy] = mapgen.NewShrine()
+			}
+		}
+
+		// Place 1 Key 'k' in another room
+		keyPlaced := false
+
+		for i, room := range g.Map.Rooms {
+			if i == 0 {
+				continue
+			}
+
+			cx, cy := room.Center()
+
+			// Place Key
+			if !keyPlaced && i != vaultRoomIdx {
+				g.Items = append(g.Items, items.NewDungeonKey(cx, cy))
+				keyPlaced = true
+				continue
+			}
+
+			// Floor 5 Dragon Boss
+			if floor == g.MaxFloors && i == len(g.Map.Rooms)-1 {
+				boss := entities.NewDragonBoss(cx, cy)
+				g.Monsters = append(g.Monsters, boss)
+				continue
+			}
+
+			// Don't spawn normal monsters inside the locked vault
+			if i == vaultRoomIdx {
+				continue
+			}
+
+			// 25% Chance to place a Chest outside vault
+			if g.RNG.Intn(100) < 25 {
+				g.Map.Tiles[cx][cy] = mapgen.NewChest()
+			}
+
+			// 15% Chance to place a Healing Fountain or Shrine outside vault
+			if g.RNG.Intn(100) < 15 {
+				if g.RNG.Intn(2) == 0 {
+					g.Map.Tiles[cx][cy] = mapgen.NewFountain()
+				} else {
+					g.Map.Tiles[cx][cy] = mapgen.NewShrine()
+				}
+			}
+
+			// Spawn 1-2 Monsters per room
+			numMonsters := g.RNG.Intn(2) + 1
+			for m := 0; m < numMonsters; m++ {
+				mx := g.RNG.Intn(room.X2-room.X1-1) + room.X1 + 1
+				my := g.RNG.Intn(room.Y2-room.Y1-1) + room.Y1 + 1
+				if !g.Map.IsBlocked(mx, my) && !g.isOccupied(mx, my) {
+					monster := entities.GenerateRandomMonster(mx, my, floor, g.RNG)
+					g.Monsters = append(g.Monsters, monster)
+				}
+			}
+
+			// Spawn 1 Item per room (70% chance)
+			if g.RNG.Intn(100) < 70 {
+				ix := g.RNG.Intn(room.X2-room.X1-1) + room.X1 + 1
+				iy := g.RNG.Intn(room.Y2-room.Y1-1) + room.Y1 + 1
+				if !g.Map.IsBlocked(ix, iy) {
+					item := items.GenerateRandomItem(ix, iy, floor, g.RNG)
+					g.Items = append(g.Items, item)
+				}
+			}
+		}
+	}
+
+	g.Map.ComputeFOV(g.Player.X, g.Player.Y, g.FOVRadius)
+}
+
+func (g *Game) isOccupied(x, y int) bool {
+	if g.Player != nil && g.Player.X == x && g.Player.Y == y {
+		return true
+	}
+	for _, m := range g.Monsters {
+		if m.IsAlive && m.X == x && m.Y == y {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Game) getMonsterAt(x, y int) *entities.Monster {
+	for _, m := range g.Monsters {
+		if m.IsAlive && m.X == x && m.Y == y {
+			return m
+		}
+	}
+	return nil
+}
+
+func (g *Game) getItemAt(x, y int) *items.Item {
+	for i, item := range g.Items {
+		if item.X == x && item.Y == y {
+			g.Items = append(g.Items[:i], g.Items[i+1:]...)
+			return item
+		}
+	}
+	return nil
+}
+
+// StartBattle initiates dedicated turn-based combat screen
+func (g *Game) StartBattle(monster *entities.Monster) {
+	g.LastPlayerX = g.Player.X
+	g.LastPlayerY = g.Player.Y
+	g.ActiveBattle = combat.NewBattle(g.Player, monster, g.RNG)
+	g.State = StateCombat
+
+	// Alert nearby monsters (Swarm Mechanic)
+	g.alertNearbyMonsters(g.Player.X, g.Player.Y, 8.0)
+}
+
+func (g *Game) alertNearbyMonsters(x, y int, radius float64) {
+	for _, m := range g.Monsters {
+		if m.IsAlive && !m.Alerted {
+			if entities.Distance(x, y, m.X, m.Y) <= radius {
+				m.Alerted = true
+			}
+		}
+	}
+}
+
+// ConcludeBattle processes battle resolution
+func (g *Game) ConcludeBattle() {
+	if g.ActiveBattle == nil {
+		g.State = StatePlaying
+		return
+	}
+
+	switch g.ActiveBattle.Result {
+	case combat.BattleVictory:
+		monster := g.ActiveBattle.Monster
+		g.Log.Add(fmt.Sprintf("VICTORY! Slew %s! (+%d EXP)", monster.Name, monster.EXP), tcell.ColorGold)
+		for _, msg := range g.ActiveBattle.LevelUpMsgs {
+			g.Log.Add(msg, tcell.ColorAqua)
+		}
+
+		// Drop Gold
+		goldReward := g.RNG.Intn(15*g.Floor+1) + 10
+		if monster.IsChampion {
+			goldReward *= 2
+		}
+		g.Player.Gold += goldReward
+		g.Log.Add(fmt.Sprintf("Looted %d Gold Coins from %s.", goldReward, monster.Name), tcell.ColorYellow)
+
+		if monster.IsBoss {
+			g.Log.Add("THE ANCIENT RED DRAGON HAS FALLEN! VICTORY IS YOURS!", tcell.ColorGold)
+			g.State = StateVictory
+			return
+		}
+
+		g.State = StatePlaying
+
+	case combat.BattleDefeat:
+		g.State = StateGameOver
+
+	case combat.BattleFled:
+		g.Log.Add("Escaped from combat back into the dungeon shadows.", tcell.ColorYellow)
+		g.Player.MoveTo(g.LastPlayerX, g.LastPlayerY)
+		g.State = StatePlaying
+	}
+
+	g.ActiveBattle = nil
+	g.Map.ComputeFOV(g.Player.X, g.Player.Y, g.FOVRadius)
+}
+
+// HandlePlayerAction handles exploration, interactions, and combat
+func (g *Game) HandlePlayerAction(dx, dy int) {
+	if g.State != StatePlaying {
+		return
+	}
+
+	destX := g.Player.X + dx
+	destY := g.Player.Y + dy
+
+	if !g.Map.InBounds(destX, destY) {
+		return
+	}
+
+	// 1. Check for Monster -> Trigger Battle!
+	targetMonster := g.getMonsterAt(destX, destY)
+	if targetMonster != nil {
+		g.StartBattle(targetMonster)
+		return
+	}
+
+	// 2. Interactive Objects & Obstacles
+	tile := g.Map.Tiles[destX][destY]
+
+	switch tile.Type {
+	case mapgen.TileDoorClosed:
+		g.Map.Tiles[destX][destY] = mapgen.NewDoorOpen()
+		g.Log.Add("You open the wooden door ('+').", tcell.ColorLightGray)
+		g.EndPlayerTurn()
+		return
+
+	case mapgen.TileDoorLocked:
+		if g.Player.Keys > 0 {
+			g.Player.Keys--
+			g.Map.Tiles[destX][destY] = mapgen.NewDoorOpen()
+			g.Log.Add("🗝️ Used a Dungeon Key ('k')! Unlocked the Vault Door ('%')!", tcell.ColorGold)
+			g.EndPlayerTurn()
+		} else {
+			g.Log.Add("🔒 The Vault Door ('%') is locked! Find an Iron Dungeon Key ('k') on this floor.", tcell.ColorRed)
+		}
+		return
+
+	case mapgen.TileChest:
+		// 15% Chance for Mimic!
+		if g.RNG.Intn(100) < 15 {
+			g.Map.Tiles[destX][destY] = mapgen.NewChestOpened()
+			g.Log.Add("⚠️ THE CHEST IS ALIVE! A Hungry Mimic attacks!", tcell.ColorRed)
+			mimic := entities.NewMimic(destX, destY)
+			g.Monsters = append(g.Monsters, mimic)
+			g.StartBattle(mimic)
+			return
+		}
+
+		// Open Chest -> Rare Loot
+		g.Map.Tiles[destX][destY] = mapgen.NewChestOpened()
+		rewardGold := g.RNG.Intn(30) + 30
+		g.Player.Gold += rewardGold
+		g.Log.Add(fmt.Sprintf("✨ Opened Treasure Chest ('=')! Found %d Gold Coins and Rare Supplies!", rewardGold), tcell.ColorGold)
+
+		rareItem := items.GenerateRandomItem(g.Player.X, g.Player.Y, g.Floor+1, g.RNG)
+		_ = g.Player.Inventory.Add(rareItem)
+		g.Log.Add(fmt.Sprintf("Obtained %s ('%c') from the chest!", rareItem.Name, rareItem.Rune), tcell.ColorLightCyan)
+		g.EndPlayerTurn()
+		return
+
+	case mapgen.TileFountain:
+		g.Map.Tiles[destX][destY] = mapgen.NewFountainUsed()
+		g.Player.HP = g.Player.MaxHP
+		g.Player.MP = g.Player.MaxMP
+		g.Log.Add("⛲ Drank from the Mystic Healing Fountain ('0')! Fully restored HP and MP!", tcell.ColorAqua)
+		g.EndPlayerTurn()
+		return
+
+	case mapgen.TileShrine:
+		if g.Player.Gold >= 30 {
+			g.Player.Gold -= 30
+			g.Map.Tiles[destX][destY] = mapgen.NewShrineUsed()
+
+			blessingType := g.RNG.Intn(3)
+			switch blessingType {
+			case 0:
+				g.Player.BaseATK += 3
+				g.Log.Add("⛩️ Prayed at the Shrine of Power ('&') (-30 Gold)! Blessed with +3 Permanent ATK!", tcell.ColorGold)
+			case 1:
+				g.Player.BaseDEF += 2
+				g.Log.Add("⛩️ Prayed at the Shrine of Power ('&') (-30 Gold)! Blessed with +2 Permanent DEF!", tcell.ColorGold)
+			case 2:
+				g.Player.MaxHP += 15
+				g.Player.HP += 15
+				g.Log.Add("⛩️ Prayed at the Shrine of Power ('&') (-30 Gold)! Blessed with +15 Permanent Max HP!", tcell.ColorGold)
+			}
+			g.EndPlayerTurn()
+		} else {
+			g.Log.Add("⛩️ The Ancient Shrine ('&') requires an offering of 30 Gold Coins to grant its blessing.", tcell.ColorDarkGray)
+		}
+		return
+	}
+
+	if g.Map.IsBlocked(destX, destY) {
+		return
+	}
+
+	// 3. Move Player
+	g.LastPlayerX = g.Player.X
+	g.LastPlayerY = g.Player.Y
+	g.Player.Move(dx, dy)
+
+	// Check Tutorial Room Triggers on Floor 0
+	if g.Floor == 0 {
+		g.checkTutorialTriggers()
+	}
+
+	// Check if stepping on an item
+	for _, itm := range g.Items {
+		if itm.X == g.Player.X && itm.Y == g.Player.Y {
+			g.Log.Add(fmt.Sprintf("Item found: %s ('%c'). Press 'g' to pick it up!", itm.Name, itm.Rune), tcell.ColorLightCyan)
+			break
+		}
+	}
+
+	// Check if standing on stairs
+	if g.Map.Tiles[g.Player.X][g.Player.Y].Type == mapgen.TileStairsDown {
+		if g.Floor == 0 {
+			g.Log.Add("Stairs Down ('>')! Press '>' to complete training and enter Floor 1.", tcell.ColorGold)
+		} else {
+			g.Log.Add(fmt.Sprintf("Stairs Down ('>')! Press '>' to descend to Floor %d.", g.Floor+1), tcell.ColorGold)
+		}
+	}
+
+	g.EndPlayerTurn()
+}
+
+func (g *Game) checkTutorialTriggers() {
+	if len(g.Map.Rooms) < 4 {
+		return
+	}
+
+	px := g.Player.X
+	r2 := g.Map.Rooms[1]
+	r3 := g.Map.Rooms[2]
+	r4 := g.Map.Rooms[3]
+
+	if px >= r2.X1 && px <= r2.X2 && !g.TutorialTriggers["room2"] {
+		g.TutorialTriggers["room2"] = true
+		g.Log.Add("TUTORIAL: Armory Chamber! Stand on items and press 'g' to loot.", tcell.ColorYellow)
+		g.Log.Add("Press 'i' to open inventory and equip weapons (')') & armor ('[').", tcell.ColorAqua)
+	}
+
+	if px >= r3.X1 && px <= r3.X2 && !g.TutorialTriggers["room3"] {
+		g.TutorialTriggers["room3"] = true
+		g.Log.Add("TUTORIAL: Combat Chamber! Training Goblin ('g') ahead.", tcell.ColorOrangeRed)
+		g.Log.Add("Walk into the goblin to engage in tactical turn-based combat!", tcell.ColorYellow)
+	}
+
+	if px >= r4.X1 && !g.TutorialTriggers["room4"] {
+		g.TutorialTriggers["room4"] = true
+		g.Log.Add("TUTORIAL: Exit Chamber! You found the Stairs Down ('>').", tcell.ColorGold)
+		g.Log.Add("Stand on the stairs and press '>' to enter Dungeon Floor 1!", tcell.ColorGold)
+	}
+}
+
+// EndPlayerTurn updates FOV, processes Monster movement on map
+func (g *Game) EndPlayerTurn() {
+	g.TurnCount++
+	g.Map.ComputeFOV(g.Player.X, g.Player.Y, g.FOVRadius)
+
+	// Regain 1 MP every 3 exploration turns
+	if g.TurnCount%3 == 0 {
+		g.Player.RestoreMP(1)
+	}
+
+	// Process Monster AI movement on map
+	for _, m := range g.Monsters {
+		if !m.IsAlive {
+			continue
+		}
+
+		distToPlayer := entities.Distance(m.X, m.Y, g.Player.X, g.Player.Y)
+
+		if g.Map.Tiles[m.X][m.Y].Visible || distToPlayer <= 6.0 {
+			if !m.Alerted {
+				m.Alerted = true
+				g.alertNearbyMonsters(m.X, m.Y, 6.0)
+			}
+		}
+
+		if !m.Alerted {
+			continue
+		}
+
+		// If monster reaches player -> Trigger Battle Screen!
+		if distToPlayer <= 1.0 {
+			g.StartBattle(m)
+			return
+		}
+
+		// Pathfind towards player
+		stepX, stepY := entities.NextStepTowards(m.X, m.Y, g.Player.X, g.Player.Y, func(x, y int) bool {
+			return g.Map.IsBlocked(x, y) || g.isOccupied(x, y)
+		})
+
+		if stepX != 0 || stepY != 0 {
+			m.Move(stepX, stepY)
+		}
+	}
+}
+
+// PickUpItem picks up the item under the player's feet
+func (g *Game) PickUpItem() {
+	if g.State != StatePlaying {
+		return
+	}
+
+	item := g.getItemAt(g.Player.X, g.Player.Y)
+	if item == nil {
+		g.Log.Add("There is nothing here to pick up.", tcell.ColorDarkGray)
+		return
+	}
+
+	if item.Type == items.TypeGold {
+		g.Player.Gold += item.Value
+		g.Log.Add(fmt.Sprintf("Collected %d Gold Coins ('$')! (Total: %d)", item.Value, g.Player.Gold), tcell.ColorYellow)
+		g.EndPlayerTurn()
+		return
+	}
+
+	if item.Type == items.TypeKey {
+		g.Player.Keys++
+		g.Log.Add("🗝️ Found an Iron Dungeon Key ('k')! Used to unlock Vault Doors ('%').", tcell.ColorGold)
+		g.EndPlayerTurn()
+		return
+	}
+
+	err := g.Player.Inventory.Add(item)
+	if err != nil {
+		g.Items = append(g.Items, item)
+		g.Log.Add(err.Error(), tcell.ColorRed)
+		return
+	}
+
+	g.Log.Add(fmt.Sprintf("Picked up %s ('%c'). Press 'i' to view/equip it.", item.Name, item.Rune), tcell.ColorGreen)
+	g.EndPlayerTurn()
+}
+
+// UseInventoryItem uses or equips the item at given index
+func (g *Game) UseInventoryItem(index int) {
+	if index < 0 || index >= len(g.Player.Inventory.Items) {
+		return
+	}
+
+	item := g.Player.Inventory.Items[index]
+
+	switch item.Type {
+	case items.TypePotion:
+		healed := g.Player.Heal(item.HealAmount)
+		g.Log.Add(fmt.Sprintf("Drank %s ('!'). Restored %d HP! (HP: %d/%d)", item.Name, healed, g.Player.HP, g.Player.MaxHP), tcell.ColorGreen)
+		_, _ = g.Player.Inventory.Remove(index)
+		g.EndPlayerTurn()
+
+	case items.TypeScroll:
+		if item.ID == "scroll_teleport" {
+			for {
+				rx := g.RNG.Intn(g.Map.Width)
+				ry := g.RNG.Intn(g.Map.Height)
+				if !g.Map.IsBlocked(rx, ry) && !g.isOccupied(rx, ry) {
+					g.Player.MoveTo(rx, ry)
+					g.Log.Add("Scroll of Teleportation ('?') cast! Teleported to a new room!", tcell.ColorViolet)
+					break
+				}
+			}
+			_, _ = g.Player.Inventory.Remove(index)
+			g.EndPlayerTurn()
+		}
+
+	case items.TypeWeapon, items.TypeArmor:
+		if item.Equipped {
+			msg := g.Player.Inventory.Unequip(item)
+			g.Log.Add(msg, tcell.ColorLightGray)
+		} else {
+			msg := g.Player.Inventory.Equip(item)
+			g.Log.Add(msg, tcell.ColorLightCyan)
+		}
+	}
+}
+
+// DropInventoryItem drops item onto floor
+func (g *Game) DropInventoryItem(index int) {
+	item, err := g.Player.Inventory.Remove(index)
+	if err != nil {
+		return
+	}
+	item.X = g.Player.X
+	item.Y = g.Player.Y
+	g.Items = append(g.Items, item)
+	g.Log.Add(fmt.Sprintf("Dropped %s on the ground.", item.Name), tcell.ColorDarkGray)
+	g.EndPlayerTurn()
+}
+
+// DescendStairs moves to next floor if on stairs
+func (g *Game) DescendStairs() {
+	if g.Map.Tiles[g.Player.X][g.Player.Y].Type != mapgen.TileStairsDown {
+		g.Log.Add("There are no stairs here to descend.", tcell.ColorDarkGray)
+		return
+	}
+
+	nextFloor := g.Floor + 1
+	if nextFloor > g.MaxFloors {
+		g.Log.Add("You have reached the bottom of the abyss!", tcell.ColorGold)
+		return
+	}
+
+	if g.Floor == 0 {
+		g.Log.Add("Training Complete! Descending into Dungeon Floor 1...", tcell.ColorGold)
+	} else {
+		g.Log.Add(fmt.Sprintf("You descend the stairs into Floor %d...", nextFloor), tcell.ColorGold)
+	}
+	g.generateFloor(nextFloor)
+}

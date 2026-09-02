@@ -1,0 +1,112 @@
+package ui
+
+import (
+	"fmt"
+
+	"github.com/gdamore/tcell/v2"
+
+	"terminal-roguelike/pkg/engine"
+	"terminal-roguelike/pkg/items"
+)
+
+// RenderInventoryModal renders the item selection inventory window
+func RenderInventoryModal(screen tcell.Screen, g *engine.Game) {
+	sw, sh := screen.Size()
+	w, h := 52, 20
+	x1 := (sw - w) / 2
+	y1 := (sh - h) / 2
+	x2 := x1 + w
+	y2 := y1 + h
+
+	// Fill background
+	for x := x1; x <= x2; x++ {
+		for y := y1; y <= y2; y++ {
+			screen.SetContent(x, y, ' ', nil, tcell.StyleDefault.Background(tcell.ColorBlack))
+		}
+	}
+
+	DrawBox(screen, x1, y1, x2, y2, tcell.StyleDefault.Foreground(tcell.ColorGold).Bold(true), "Inventory")
+
+	inv := g.Player.Inventory
+	if len(inv.Items) == 0 {
+		DrawText(screen, x1+4, y1+4, tcell.StyleDefault.Foreground(tcell.ColorDarkGray), "Your backpack is empty.")
+	} else {
+		for i, itm := range inv.Items {
+			letter := rune('a' + i)
+			style := tcell.StyleDefault.Foreground(tcell.ColorWhite)
+
+			status := ""
+			if itm.Equipped {
+				status = " (Equipped)"
+				style = style.Foreground(tcell.ColorGreen).Bold(true)
+			} else if itm.Type == items.TypePotion {
+				style = style.Foreground(tcell.ColorLightCoral)
+			} else if itm.Type == items.TypeScroll {
+				style = style.Foreground(tcell.ColorViolet)
+			}
+
+			line := fmt.Sprintf("[%c] %s - %s%s", letter, itm.Name, itm.Description, status)
+			DrawText(screen, x1+3, y1+2+i, style, line)
+		}
+	}
+
+	DrawText(screen, x1+3, y2-2, tcell.StyleDefault.Foreground(tcell.ColorYellow), "Press [a-z] to Use/Equip | [d]+[a-z] Drop | [Esc/i] Close")
+}
+
+// RenderGameOverModal renders the death screen
+func RenderGameOverModal(screen tcell.Screen, g *engine.Game) {
+	sw, sh := screen.Size()
+	w, h := 46, 14
+	x1 := (sw - w) / 2
+	y1 := (sh - h) / 2
+	x2 := x1 + w
+	y2 := y1 + h
+
+	for x := x1; x <= x2; x++ {
+		for y := y1; y <= y2; y++ {
+			screen.SetContent(x, y, ' ', nil, tcell.StyleDefault.Background(tcell.ColorBlack))
+		}
+	}
+
+	DrawBox(screen, x1, y1, x2, y2, tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true), "YOU DIED")
+
+	score := g.Player.Gold + (g.Player.Kills * 25) + (g.Floor * 100) + (g.Player.Level * 50)
+
+	DrawText(screen, x1+4, y1+3, tcell.StyleDefault.Foreground(tcell.ColorDarkRed).Bold(true), "Your journey ends in the dark abyss...")
+	DrawText(screen, x1+4, y1+5, tcell.StyleDefault.Foreground(tcell.ColorWhite), fmt.Sprintf("Dungeon Floor: %d / %d", g.Floor, g.MaxFloors))
+	DrawText(screen, x1+4, y1+6, tcell.StyleDefault.Foreground(tcell.ColorWhite), fmt.Sprintf("Hero Level:    %d", g.Player.Level))
+	DrawText(screen, x1+4, y1+7, tcell.StyleDefault.Foreground(tcell.ColorWhite), fmt.Sprintf("Monsters Slain: %d", g.Player.Kills))
+	DrawText(screen, x1+4, y1+8, tcell.StyleDefault.Foreground(tcell.ColorGold), fmt.Sprintf("Gold Treasure: %d", g.Player.Gold))
+	DrawText(screen, x1+4, y1+10, tcell.StyleDefault.Foreground(tcell.ColorYellow).Bold(true), fmt.Sprintf("FINAL SCORE:   %d", score))
+
+	DrawText(screen, x1+4, y2-2, tcell.StyleDefault.Foreground(tcell.ColorDarkGray), "Press [r] to Restart or [q] to Quit")
+}
+
+// RenderVictoryModal renders the game victory screen
+func RenderVictoryModal(screen tcell.Screen, g *engine.Game) {
+	sw, sh := screen.Size()
+	w, h := 50, 15
+	x1 := (sw - w) / 2
+	y1 := (sh - h) / 2
+	x2 := x1 + w
+	y2 := y1 + h
+
+	for x := x1; x <= x2; x++ {
+		for y := y1; y <= y2; y++ {
+			screen.SetContent(x, y, ' ', nil, tcell.StyleDefault.Background(tcell.ColorBlack))
+		}
+	}
+
+	DrawBox(screen, x1, y1, x2, y2, tcell.StyleDefault.Foreground(tcell.ColorGold).Bold(true), "VICTORY!")
+
+	score := g.Player.Gold + (g.Player.Kills * 50) + 1000 + (g.Player.Level * 100)
+
+	DrawText(screen, x1+4, y1+3, tcell.StyleDefault.Foreground(tcell.ColorYellow).Bold(true), "THE ANCIENT DRAGON HAS BEEN DEFEATED!")
+	DrawText(screen, x1+4, y1+4, tcell.StyleDefault.Foreground(tcell.ColorGreen), "You have conquered the Dungeon of Shadows!")
+	DrawText(screen, x1+4, y1+6, tcell.StyleDefault.Foreground(tcell.ColorWhite), fmt.Sprintf("Hero Level:     %d", g.Player.Level))
+	DrawText(screen, x1+4, y1+7, tcell.StyleDefault.Foreground(tcell.ColorWhite), fmt.Sprintf("Monsters Slain: %d", g.Player.Kills))
+	DrawText(screen, x1+4, y1+8, tcell.StyleDefault.Foreground(tcell.ColorGold), fmt.Sprintf("Gold Treasure:  %d", g.Player.Gold))
+	DrawText(screen, x1+4, y1+10, tcell.StyleDefault.Foreground(tcell.ColorGold).Bold(true), fmt.Sprintf("VICTORY SCORE:  %d", score))
+
+	DrawText(screen, x1+4, y2-2, tcell.StyleDefault.Foreground(tcell.ColorDarkGray), "Press [r] to Play Again or [q] to Quit")
+}
