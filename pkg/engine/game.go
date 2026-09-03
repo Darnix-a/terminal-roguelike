@@ -54,10 +54,15 @@ func NewGame(mapW, mapH int) *Game {
 		mapH = 22
 	}
 
+	startFloor := 0
+	if HasCompletedTutorial() {
+		startFloor = 1
+	}
+
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	g := &Game{
 		State:            StatePlaying,
-		Floor:            0,
+		Floor:            startFloor,
 		MaxFloors:        5,
 		TurnCount:        0,
 		Log:              NewMessageLog(100),
@@ -69,7 +74,7 @@ func NewGame(mapW, mapH int) *Game {
 		TutorialTriggers: make(map[string]bool),
 	}
 
-	g.generateFloor(0)
+	g.generateFloor(startFloor)
 	return g
 }
 
@@ -726,6 +731,7 @@ func (g *Game) DescendStairs() {
 	}
 
 	if g.Floor == 0 {
+		MarkTutorialCompleted()
 		g.Log.Add("Training Complete! Descending into Dungeon Floor 1...", tcell.ColorGold)
 		g.Log.Add("Tutorial items cleared. Entering the dungeon with starter loadout!", tcell.ColorYellow)
 		g.Player = nil // Reset inventory & stats on entry to Floor 1

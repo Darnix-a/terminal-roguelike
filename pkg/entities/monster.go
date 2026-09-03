@@ -254,8 +254,27 @@ func GenerateRandomMonster(x, y, floor int, rng *rand.Rand) *Monster {
 		}
 	}
 
-	// 25% Chance for Monster to be an Elite Champion
-	if rng.Intn(100) < 25 {
+	// Dynamic Floor Scaling: Enemies become tougher on deeper floors
+	if floor > 1 {
+		floorBonusHP := (floor - 1) * 5
+		floorBonusATK := (floor - 1) * 2
+		floorBonusDEF := (floor - 1) / 2
+		floorBonusEXP := (floor - 1) * 10
+
+		m.MaxHP += floorBonusHP
+		m.HP = m.MaxHP
+		m.ATK += floorBonusATK
+		m.DEF += floorBonusDEF
+		m.EXP += floorBonusEXP
+	}
+
+	// Champion spawn chance scales with floor depth (15% on F1 up to 35% on F4+)
+	champChance := 15 + (floor * 5)
+	if champChance > 35 {
+		champChance = 35
+	}
+
+	if rng.Intn(100) < champChance {
 		m.IsChampion = true
 		affixes := []string{"[Fiery]", "[Vampiric]", "[Armored]", "[Frenzied]"}
 		m.Affix = affixes[rng.Intn(len(affixes))]
