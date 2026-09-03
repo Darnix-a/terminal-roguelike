@@ -115,25 +115,25 @@ func (b *Battle) PlayerUseSkill(skillIdx int) {
 
 	switch skill.ID {
 	case "heavy_slash":
-		dmg := int(float64(b.Player.TotalATK()) * 1.6) - (b.Monster.DEF / 2)
-		if dmg < 3 {
-			dmg = 3
+		dmg := int(float64(b.Player.TotalATK()) * 1.8) - (b.Monster.DEF / 2)
+		if dmg < 4 {
+			dmg = 4
 		}
 		dmg += b.RNG.Intn(3)
 		b.Monster.HP -= dmg
 		b.AddLog(fmt.Sprintf("💥 Heavy Slash! You cleave %s for %d physical damage!", b.Monster.Name, dmg), tcell.ColorOrangeRed)
 
 	case "fireball":
-		dmg := 14 + (b.Player.Level * 3) + b.RNG.Intn(4)
+		dmg := 16 + (b.Player.Level * 4) + b.RNG.Intn(4)
 		b.Monster.HP -= dmg
 		b.AddLog(fmt.Sprintf("🔥 Fireball! Incinerating flames blast %s for %d magic damage!", b.Monster.Name, dmg), tcell.ColorOrange)
 
 	case "shield_guard":
 		b.Player.Guarding = true
-		b.AddLog("🛡️ Shield Stance! You brace yourself, reducing next incoming damage by 70%.", tcell.ColorSkyblue)
+		b.AddLog("🛡️ Shield Stance! You brace yourself, absorbing 75% incoming damage.", tcell.ColorSkyblue)
 
 	case "holy_heal":
-		healed := b.Player.Heal(30)
+		healed := b.Player.Heal(35)
 		b.AddLog(fmt.Sprintf("✨ Holy Light! Restored %d HP! (Current HP: %d/%d)", healed, b.Player.HP, b.Player.MaxHP), tcell.ColorGreen)
 	}
 
@@ -249,9 +249,9 @@ func (b *Battle) EnemyTurn() {
 		}
 	}
 
-	// If player is guarding -> 70% reduction
+	// If player is guarding -> 75% reduction
 	if b.Player.Guarding {
-		finalDmg = int(float64(finalDmg) * 0.3)
+		finalDmg = int(float64(finalDmg) * 0.25)
 		if finalDmg < 1 {
 			finalDmg = 1
 		}

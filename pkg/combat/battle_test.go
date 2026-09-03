@@ -20,10 +20,10 @@ func TestTurnBasedBattle(t *testing.T) {
 
 	// Test Skill (Heavy Slash)
 	initialMP := player.MP
-	battle.PlayerUseSkill(0) // Heavy Slash (6 MP)
+	battle.PlayerUseSkill(0) // Heavy Slash (5 MP)
 
-	if player.MP != initialMP-6 {
-		t.Errorf("Expected MP to decrease by 6, got %d", player.MP)
+	if player.MP != initialMP-5 {
+		t.Errorf("Expected MP to decrease by 5, got %d", player.MP)
 	}
 
 	if goblin.HP >= goblin.MaxHP {

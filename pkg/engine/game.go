@@ -346,7 +346,7 @@ func (g *Game) StartBattle(monster *entities.Monster) {
 	g.State = StateCombat
 
 	// Alert nearby monsters (Swarm Mechanic)
-	g.alertNearbyMonsters(g.Player.X, g.Player.Y, 8.0)
+	g.alertNearbyMonsters(g.Player.X, g.Player.Y, 4.0)
 }
 
 func (g *Game) alertNearbyMonsters(x, y int, radius float64) {
@@ -664,9 +664,14 @@ func (g *Game) EndPlayerTurn() {
 	g.TurnCount++
 	g.Map.ComputeFOV(g.Player.X, g.Player.Y, g.FOVRadius)
 
-	// Regain 1 MP every 3 exploration turns
-	if g.TurnCount%3 == 0 {
+	// Regain 1 MP every 2 exploration turns
+	if g.TurnCount%2 == 0 {
 		g.Player.RestoreMP(1)
+	}
+
+	// Regain 1 HP every 5 exploration turns
+	if g.TurnCount%5 == 0 {
+		g.Player.Heal(1)
 	}
 
 	// Process Monster AI movement on map
@@ -677,10 +682,10 @@ func (g *Game) EndPlayerTurn() {
 
 		distToPlayer := entities.Distance(m.X, m.Y, g.Player.X, g.Player.Y)
 
-		if g.Map.Tiles[m.X][m.Y].Visible || distToPlayer <= 6.0 {
+		if g.Map.Tiles[m.X][m.Y].Visible || distToPlayer <= 4.0 {
 			if !m.Alerted {
 				m.Alerted = true
-				g.alertNearbyMonsters(m.X, m.Y, 6.0)
+				g.alertNearbyMonsters(m.X, m.Y, 4.0)
 			}
 		}
 
