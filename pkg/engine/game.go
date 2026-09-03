@@ -186,39 +186,77 @@ func (g *Game) generateFloor(floor int) {
 			g.Log.Add("WARNING: THE ANCIENT RED DRAGON LAIRS ON THIS FLOOR!", tcell.ColorRed)
 		}
 
-		vaultRoomIdx := -1
-		shopRoomIdx := -1
-
-		// Room 1: Locked Vault
-		if len(g.Map.Rooms) > 3 {
-			vaultRoomIdx = 1
-			vRoom := g.Map.Rooms[vaultRoomIdx]
-			vx, vy := vRoom.Center()
-
-			g.Map.Tiles[vRoom.X1][vy] = mapgen.NewDoorLocked()
-			g.Map.Tiles[vx][vy] = mapgen.NewChest()
-
-			if g.RNG.Intn(2) == 0 {
-				g.Map.Tiles[vx+1][vy] = mapgen.NewFountain()
-			} else {
-				g.Map.Tiles[vx+1][vy] = mapgen.NewShrine()
+		// Identify candidate rooms for Vault and Shop
+		numRooms := len(g.Map.Rooms)
+		exitRoomIdx := numRooms - 1
+		for rIdx, r := range g.Map.Rooms {
+			if r.Contains(g.Map.StairsDownX, g.Map.StairsDownY) {
+				exitRoomIdx = rIdx
+				break
 			}
 		}
 
-		// Room 2: Dungeon Shop on Floors 2 and 4
-		if (floor == 2 || floor == 4) && len(g.Map.Rooms) > 4 {
-			shopRoomIdx = 2
+		// Find candidate side / dead-end rooms
+		candidateRooms := make([]int, 0)
+		for i := 1; i < numRooms; i++ {
+			if i != exitRoomIdx {
+				candidateRooms = append(candidateRooms, i)
+			}
+		}
+		g.RNG.Shuffle(len(candidateRooms), func(i, j int) {
+			candidateRooms[i], candidateRooms[j] = candidateRooms[j], candidateRooms[i]
+		})
+
+		vaultRoomIdx := -1
+		shopRoomIdx := -1
+
+		// Pick 1 random side room for Locked Vault
+		if len(candidateRooms) > 0 {
+			vaultRoomIdx = candidateRooms[0]
+			candidateRooms = candidateRooms[1:]
+
+			// Seal true corridor doorways with Locked Doors '%'
+			for _, pt := range g.Map.Doorways[vaultRoomIdx] {
+				g.Map.Tiles[pt.X][pt.Y] = mapgen.NewDoorLocked()
+			}
+
+			vRoom := g.Map.Rooms[vaultRoomIdx]
+			// Place chest at random interior tile
+			chestX := g.RNG.Intn(vRoom.X2-vRoom.X1-1) + vRoom.X1 + 1
+			chestY := g.RNG.Intn(vRoom.Y2-vRoom.Y1-1) + vRoom.Y1 + 1
+			g.Map.Tiles[chestX][chestY] = mapgen.NewChest()
+
+			// Place fountain or shrine at another random tile
+			for attempt := 0; attempt < 10; attempt++ {
+				fx := g.RNG.Intn(vRoom.X2-vRoom.X1-1) + vRoom.X1 + 1
+				fy := g.RNG.Intn(vRoom.Y2-vRoom.Y1-1) + vRoom.Y1 + 1
+				if fx != chestX || fy != chestY {
+					if g.RNG.Intn(2) == 0 {
+						g.Map.Tiles[fx][fy] = mapgen.NewFountain()
+					} else {
+						g.Map.Tiles[fx][fy] = mapgen.NewShrine()
+					}
+					break
+				}
+			}
+		}
+
+		// Pick 1 random side room for Dungeon Shop on Floors 2 and 4
+		if (floor == 2 || floor == 4) && len(candidateRooms) > 0 {
+			shopRoomIdx = candidateRooms[0]
+			candidateRooms = candidateRooms[1:]
+
 			sRoom := g.Map.Rooms[shopRoomIdx]
 			sx, sy := sRoom.Center()
 
 			merchant := entities.NewEntity("merchant", "Wandering Merchant", 'S', tcell.ColorGold, sx, sy, true)
 			merchantMonster := &entities.Monster{
 				Entity:     merchant,
-				HP:         85,
-				MaxHP:      85,
-				ATK:        19,
-				DEF:        6,
-				EXP:        250,
+				HP:         70,
+				MaxHP:      70,
+				ATK:        16,
+				DEF:        5,
+				EXP:        200,
 				IsMerchant: true,
 				Alerted:    false,
 				Sprite: []string{
@@ -228,14 +266,26 @@ func (g *Game) generateFloor(floor int) {
 				},
 				Actions: []entities.MonsterAction{
 					{Name: "Ledger Strike", DamageMult: 1.2, Description: "slams you with a heavy gilded accounting tome"},
-					{Name: "Coin Gatling", DamageMult: 2.2, IsTelegraphed: true, TelegraphWarning: "loads a sack of pure gold coins for a COIN GATLING assault!", Description: "unleashes a relentless flurry of hypersonic golden coins"},
+					{Name: "Coin Gatling", DamageMult: 2.0, IsTelegraphed: true, TelegraphWarning: "loads a sack of pure gold coins for a COIN GATLING assault!", Description: "unleashes a flurry of hypersonic golden coins"},
 				},
 			}
 			g.Monsters = append(g.Monsters, merchantMonster)
 			g.ActiveMerchant = merchantMonster
 		}
 
-		// Place 1 Key 'k' in a non-vault room
+		// Add wooden doors to 30% of normal doorways
+		for rIdx := 0; rIdx < numRooms; rIdx++ {
+			if rIdx == vaultRoomIdx {
+				continue
+			}
+			for _, pt := range g.Map.Doorways[rIdx] {
+				if g.RNG.Intn(100) < 30 && g.Map.Tiles[pt.X][pt.Y].Type == mapgen.TileFloor {
+					g.Map.Tiles[pt.X][pt.Y] = mapgen.NewDoorClosed()
+				}
+			}
+		}
+
+		// Place 1 Iron Key 'k' in a random accessible room
 		keyPlaced := false
 
 		for i, room := range g.Map.Rooms {
@@ -243,17 +293,19 @@ func (g *Game) generateFloor(floor int) {
 				continue // Skip spawn room
 			}
 
-			cx, cy := room.Center()
-
 			// Place Key
 			if !keyPlaced && i != vaultRoomIdx && i != shopRoomIdx {
-				g.Items = append(g.Items, items.NewDungeonKey(cx, cy))
-				keyPlaced = true
-				continue
+				kx := g.RNG.Intn(room.X2-room.X1-1) + room.X1 + 1
+				ky := g.RNG.Intn(room.Y2-room.Y1-1) + room.Y1 + 1
+				if !g.Map.IsBlocked(kx, ky) {
+					g.Items = append(g.Items, items.NewDungeonKey(kx, ky))
+					keyPlaced = true
+				}
 			}
 
 			// Floor 5 Dragon Boss
-			if floor == g.MaxFloors && i == len(g.Map.Rooms)-1 {
+			if floor == g.MaxFloors && i == exitRoomIdx {
+				cx, cy := room.Center()
 				boss := entities.NewDragonBoss(cx, cy)
 				g.Monsters = append(g.Monsters, boss)
 				continue
@@ -264,22 +316,33 @@ func (g *Game) generateFloor(floor int) {
 				continue
 			}
 
-			// 25% Chance to place a Chest outside vault
-			if g.RNG.Intn(100) < 25 {
-				g.Map.Tiles[cx][cy] = mapgen.NewChest()
+			// 20% Chance to place a Chest outside vault
+			if g.RNG.Intn(100) < 20 {
+				cx := g.RNG.Intn(room.X2-room.X1-1) + room.X1 + 1
+				cy := g.RNG.Intn(room.Y2-room.Y1-1) + room.Y1 + 1
+				if !g.Map.IsBlocked(cx, cy) {
+					g.Map.Tiles[cx][cy] = mapgen.NewChest()
+				}
 			}
 
 			// 15% Chance to place a Fountain or Shrine
 			if g.RNG.Intn(100) < 15 {
-				if g.RNG.Intn(2) == 0 {
-					g.Map.Tiles[cx][cy] = mapgen.NewFountain()
-				} else {
-					g.Map.Tiles[cx][cy] = mapgen.NewShrine()
+				fx := g.RNG.Intn(room.X2-room.X1-1) + room.X1 + 1
+				fy := g.RNG.Intn(room.Y2-room.Y1-1) + room.Y1 + 1
+				if !g.Map.IsBlocked(fx, fy) {
+					if g.RNG.Intn(2) == 0 {
+						g.Map.Tiles[fx][fy] = mapgen.NewFountain()
+					} else {
+						g.Map.Tiles[fx][fy] = mapgen.NewShrine()
+					}
 				}
 			}
 
-			// Spawn 1-2 Monsters per room
+			// Spawn Monsters
 			numMonsters := g.RNG.Intn(2) + 1
+			if floor >= 3 {
+				numMonsters = g.RNG.Intn(2) + 1
+			}
 			for m := 0; m < numMonsters; m++ {
 				mx := g.RNG.Intn(room.X2-room.X1-1) + room.X1 + 1
 				my := g.RNG.Intn(room.Y2-room.Y1-1) + room.Y1 + 1
@@ -289,8 +352,8 @@ func (g *Game) generateFloor(floor int) {
 				}
 			}
 
-			// Spawn 1 Item per room (70% chance)
-			if g.RNG.Intn(100) < 70 {
+			// Spawn 1 Item (60% chance)
+			if g.RNG.Intn(100) < 60 {
 				ix := g.RNG.Intn(room.X2-room.X1-1) + room.X1 + 1
 				iy := g.RNG.Intn(room.Y2-room.Y1-1) + room.Y1 + 1
 				if !g.Map.IsBlocked(ix, iy) {
