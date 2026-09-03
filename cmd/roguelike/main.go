@@ -179,14 +179,25 @@ func main() {
 					}
 				}
 
-			// 5. LEVEL UP SKILL CHOICE MODAL
+			// 5. LEVEL UP SKILL CHOICE / REPLACEMENT MODAL
 			case engine.StateLevelUp:
 				r := ev.Rune()
-				if r >= '1' && r <= '3' {
-					choiceIdx := int(r - '1')
-					game.SelectLevelUpSkill(choiceIdx)
-				} else if ev.Key() == tcell.KeyEscape {
-					game.State = engine.StatePlaying
+				if game.PendingSkill != nil {
+					// Replacement sub-step (choose slot 1-5 to replace)
+					if r >= '1' && r <= '5' {
+						slotIdx := int(r - '1')
+						game.SelectLevelUpSkill(slotIdx)
+					} else if r == '0' || r == 's' || r == 'S' || ev.Key() == tcell.KeyEscape {
+						game.SkipLevelUpSkill()
+					}
+				} else {
+					// Offered skill selection (1-3) or Skip (0)
+					if r >= '1' && r <= '3' {
+						choiceIdx := int(r - '1')
+						game.SelectLevelUpSkill(choiceIdx)
+					} else if r == '0' || r == 's' || r == 'S' || ev.Key() == tcell.KeyEscape || r == ' ' {
+						game.SkipLevelUpSkill()
+					}
 				}
 
 			// 6. INVENTORY MODAL (Arrow Key / WASD navigation)

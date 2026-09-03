@@ -22,7 +22,7 @@ irm https://raw.githubusercontent.com/Darnix-a/terminal-roguelike/main/install.p
 * **Branching MST Dungeon Generation:** Procedural layouts with rooms, corridor loops, and 1-tile choke points.
 * **Dedicated Turn-Based Battle Screen:** Tactical JRPG-style combat with monster ASCII art, dynamic health/mana bars, and action logs.
 * **Attack Telegraphs & Guarding:** Heavy monster attacks are telegraphed 1 turn in advance. Shield Guard absorbs 75% incoming damage.
-* **Hero Leveling & Skill Choices:** Gain EXP from defeated enemies to level up. Choose 1 of 3 random skills at each level up from a pool of 12 distinct abilities.
+* **Hero Leveling & Skill Choices:** Gain EXP from defeated enemies to level up. Choose 1 of 3 random skills at each level up from a pool of 12 distinct abilities (max 5 active abilities, with option to skip or replace existing skills).
 * **Dungeon Merchant Shop (`S`):** Spawns on floors 2 and 4 to buy potions, enchantment scrolls, and shields. Attacking the merchant triggers an Enraged Shopkeeper boss fight.
 * **Locked Vaults & Keys (`k`, `%`):** Secret vault chambers requiring dungeon keys to unlock.
 * **Interactive Arrow-Key Inventory:** Navigate inventory with arrow keys/WASD, equip/unequip gear with Enter, and drop items with `d` or `x`.
@@ -68,7 +68,8 @@ irm https://raw.githubusercontent.com/Darnix-a/terminal-roguelike/main/install.p
 ### Level-Up Screen
 | Key | Action |
 | --- | --- |
-| `1` - `3` | Choose and learn skill |
+| `1` - `3` | Choose and learn skill (or select slot to replace) |
+| `0` / `Esc` | Skip / Keep current skills |
 
 ---
 

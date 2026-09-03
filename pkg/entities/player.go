@@ -8,6 +8,8 @@ import (
 	"terminal-roguelike/pkg/items"
 )
 
+const MaxSkills = 5
+
 type Player struct {
 	*Entity
 	HP             int
@@ -67,7 +69,7 @@ func NewPlayer(x, y int) *Player {
 		BaseDEF:        2,
 		Level:          1,
 		EXP:            0,
-		MaxEXP:         60,
+		MaxEXP:         100,
 		Gold:           0,
 		Keys:           0,
 		Kills:          0,
@@ -104,13 +106,25 @@ func (p *Player) RestoreMP(amount int) int {
 	return p.MP - prev
 }
 
-func (p *Player) LearnSkill(skill Skill) {
+func (p *Player) LearnSkill(skill Skill) bool {
+	if len(p.Skills) >= MaxSkills {
+		return false
+	}
 	for _, s := range p.Skills {
 		if s.ID == skill.ID {
-			return
+			return false
 		}
 	}
 	p.Skills = append(p.Skills, skill)
+	return true
+}
+
+func (p *Player) ReplaceSkill(slotIdx int, skill Skill) bool {
+	if slotIdx < 0 || slotIdx >= len(p.Skills) {
+		return false
+	}
+	p.Skills[slotIdx] = skill
+	return true
 }
 
 func (p *Player) GainEXP(amount int) (bool, []string) {
@@ -122,7 +136,7 @@ func (p *Player) GainEXP(amount int) (bool, []string) {
 		p.EXP -= p.MaxEXP
 		p.Level++
 		leveledUp = true
-		p.MaxEXP = int(float64(p.MaxEXP) * 1.8)
+		p.MaxEXP = int(float64(p.MaxEXP) * 2.2)
 		p.MaxHP += 6
 		p.HP = p.MaxHP
 		p.MaxMP += 3

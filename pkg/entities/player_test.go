@@ -40,13 +40,18 @@ func TestPlayerLevelUpAndHealing(t *testing.T) {
 		t.Errorf("Expected BaseATK to increase after level up")
 	}
 
-	// Test Learn Skill
-	initialSkills := len(player.Skills)
-	unlearned := GetUnlearnedSkills(player.Skills)
-	if len(unlearned) > 0 {
-		player.LearnSkill(unlearned[0])
-		if len(player.Skills) != initialSkills+1 {
-			t.Errorf("Expected skills count %d, got %d", initialSkills+1, len(player.Skills))
-		}
+	// Test Learn Skill up to MaxSkills = 5
+	for _, sk := range SkillRegistry {
+		player.LearnSkill(sk)
+	}
+	if len(player.Skills) != MaxSkills {
+		t.Errorf("Expected player skills to be capped at %d, got %d", MaxSkills, len(player.Skills))
+	}
+
+	// Test ReplaceSkill
+	newSkill := Skill{ID: "test_skill", Name: "Test Skill", MPCost: 9, Description: "Test"}
+	success := player.ReplaceSkill(0, newSkill)
+	if !success || player.Skills[0].ID != "test_skill" {
+		t.Errorf("Failed to replace skill at slot 0")
 	}
 }

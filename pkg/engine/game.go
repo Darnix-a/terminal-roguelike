@@ -46,6 +46,7 @@ type Game struct {
 	ActiveBattle     *combat.Battle
 	ActiveMerchant   *entities.Monster
 	OfferedSkills    []entities.Skill
+	PendingSkill     *entities.Skill
 	LastPlayerX      int
 	LastPlayerY      int
 	TutorialTriggers map[string]bool
@@ -514,6 +515,7 @@ func (g *Game) CheckLevelUpChoices() {
 	choices := entities.PickRandomSkillChoices(g.Player.Skills, g.RNG)
 	if len(choices) > 0 {
 		g.OfferedSkills = choices
+		g.PendingSkill = nil
 		g.State = StateLevelUp
 	} else {
 		g.State = StatePlaying
@@ -521,15 +523,54 @@ func (g *Game) CheckLevelUpChoices() {
 }
 
 func (g *Game) SelectLevelUpSkill(choiceIdx int) {
+	// If in replacement mode (player has 5/5 abilities and is selecting which slot to replace)
+	if g.PendingSkill != nil {
+		if choiceIdx >= 0 && choiceIdx < len(g.Player.Skills) {
+			oldSkill := g.Player.Skills[choiceIdx]
+			g.Player.ReplaceSkill(choiceIdx, *g.PendingSkill)
+			g.Log.Add(fmt.Sprintf("🌟 Replaced [%s] with new ability: %s (%d MP)!", oldSkill.Name, g.PendingSkill.Name, g.PendingSkill.MPCost), tcell.ColorAqua)
+			g.PendingSkill = nil
+			g.OfferedSkills = nil
+			g.State = StatePlaying
+			if g.Floor > 0 {
+				SaveGameProgress(g)
+			}
+		}
+		return
+	}
+
+	// Normal 1-3 offered skill choice
 	if choiceIdx >= 0 && choiceIdx < len(g.OfferedSkills) {
 		picked := g.OfferedSkills[choiceIdx]
-		g.Player.LearnSkill(picked)
-		g.Log.Add(fmt.Sprintf("🌟 You mastered a new ability: %s (%d MP)!", picked.Name, picked.MPCost), tcell.ColorAqua)
-		g.OfferedSkills = nil
-		g.State = StatePlaying
-		if g.Floor > 0 {
-			SaveGameProgress(g)
+		if len(g.Player.Skills) >= entities.MaxSkills {
+			// At max 5 capacity -> prompt to replace an existing skill
+			g.PendingSkill = &picked
+		} else {
+			// Room available (< 5 skills) -> learn directly
+			g.Player.LearnSkill(picked)
+			g.Log.Add(fmt.Sprintf("🌟 You mastered a new ability: %s (%d MP)!", picked.Name, picked.MPCost), tcell.ColorAqua)
+			g.OfferedSkills = nil
+			g.PendingSkill = nil
+			g.State = StatePlaying
+			if g.Floor > 0 {
+				SaveGameProgress(g)
+			}
 		}
+	}
+}
+
+func (g *Game) SkipLevelUpSkill() {
+	if g.PendingSkill != nil {
+		// Cancel replacement and return to offered skill choices
+		g.PendingSkill = nil
+		return
+	}
+	g.OfferedSkills = nil
+	g.PendingSkill = nil
+	g.State = StatePlaying
+	g.Log.Add("Skipped learning a new ability this level.", tcell.ColorDarkGray)
+	if g.Floor > 0 {
+		SaveGameProgress(g)
 	}
 }
 

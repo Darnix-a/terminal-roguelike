@@ -6,6 +6,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 
 	"terminal-roguelike/pkg/engine"
+	"terminal-roguelike/pkg/entities"
 	"terminal-roguelike/pkg/items"
 )
 
@@ -159,10 +160,10 @@ func RenderShopModal(screen tcell.Screen, g *engine.Game) {
 	DrawText(screen, x1+3, y1+13, tcell.StyleDefault.Foreground(tcell.ColorYellow), "Press [1-5] to Buy | [A] Attack | [Esc/q] Leave Shop")
 }
 
-// RenderLevelUpModal renders the skill choice level-up modal
+// RenderLevelUpModal renders the skill choice / replacement level-up modal
 func RenderLevelUpModal(screen tcell.Screen, g *engine.Game) {
 	sw, sh := screen.Size()
-	w, h := 64, 16
+	w, h := 66, 18
 	x1 := (sw - w) / 2
 	y1 := (sh - h) / 2
 	x2 := x1 + w
@@ -174,10 +175,38 @@ func RenderLevelUpModal(screen tcell.Screen, g *engine.Game) {
 		}
 	}
 
-	title := fmt.Sprintf("🌟 LEVEL UP! CHOOSE A NEW SKILL (Level %d)", g.Player.Level)
+	if g.PendingSkill != nil {
+		// Replacement selection screen (5/5 capacity reached)
+		title := fmt.Sprintf("REPLACE SKILL WITH [%s]", g.PendingSkill.Name)
+		DrawBox(screen, x1, y1, x2, y2, tcell.StyleDefault.Foreground(tcell.ColorOrangeRed).Bold(true), title)
+
+		DrawText(screen, x1+3, y1+2, tcell.StyleDefault.Foreground(tcell.ColorYellow), "Ability capacity reached (5/5)! Choose which skill to forget:")
+
+		for i, sk := range g.Player.Skills {
+			rowY := y1 + 4 + (i * 2)
+			line := fmt.Sprintf("[%d] %s (%d MP) - %s", i+1, sk.Name, sk.MPCost, sk.Description)
+			if len(line) > w-6 {
+				line = line[:w-9] + "..."
+			}
+			DrawText(screen, x1+4, rowY, tcell.StyleDefault.Foreground(tcell.ColorLightCoral), line)
+		}
+
+		prompt := fmt.Sprintf("Press [1-%d] to Replace | [0/Esc] Cancel & Keep Current", len(g.Player.Skills))
+		DrawText(screen, (sw-len(prompt))/2, y2-2, tcell.StyleDefault.Foreground(tcell.ColorGold), prompt)
+		return
+	}
+
+	// Offered skills screen
+	skillCount := len(g.Player.Skills)
+	statusStr := fmt.Sprintf("[%d/%d Abilities]", skillCount, entities.MaxSkills)
+	title := fmt.Sprintf("🌟 LEVEL UP! (Level %d) %s", g.Player.Level, statusStr)
 	DrawBox(screen, x1, y1, x2, y2, tcell.StyleDefault.Foreground(tcell.ColorGold).Bold(true), title)
 
-	DrawText(screen, x1+3, y1+2, tcell.StyleDefault.Foreground(tcell.ColorYellow), "Your mastery expands! Select a new ability to learn:")
+	if skillCount >= entities.MaxSkills {
+		DrawText(screen, x1+3, y1+2, tcell.StyleDefault.Foreground(tcell.ColorOrange), "Select an ability to REPLACE an existing skill, or press [0] to keep current:")
+	} else {
+		DrawText(screen, x1+3, y1+2, tcell.StyleDefault.Foreground(tcell.ColorYellow), "Select a new ability to learn, or press [0] to skip:")
+	}
 
 	for i, sk := range g.OfferedSkills {
 		rowY := y1 + 4 + (i * 3)
@@ -186,6 +215,6 @@ func RenderLevelUpModal(screen tcell.Screen, g *engine.Game) {
 		DrawText(screen, x1+8, rowY+1, tcell.StyleDefault.Foreground(tcell.ColorLightGray), sk.Description)
 	}
 
-	prompt := fmt.Sprintf("Press [1-%d] to Learn Skill", len(g.OfferedSkills))
+	prompt := fmt.Sprintf("Press [1-%d] to Select | [0] Skip / Don't Take Skill", len(g.OfferedSkills))
 	DrawText(screen, (sw-len(prompt))/2, y2-2, tcell.StyleDefault.Foreground(tcell.ColorGold), prompt)
 }

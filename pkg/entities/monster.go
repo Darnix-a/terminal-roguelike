@@ -50,7 +50,7 @@ func NewGoblin(x, y int) *Monster {
 		MaxHP:    18,
 		ATK:      5,
 		DEF:      2,
-		EXP:      12,
+		EXP:      6,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -75,7 +75,7 @@ func NewSkeleton(x, y int) *Monster {
 		MaxHP:    32,
 		ATK:      9,
 		DEF:      4,
-		EXP:      22,
+		EXP:      14,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -100,7 +100,7 @@ func NewOrc(x, y int) *Monster {
 		MaxHP:    52,
 		ATK:      14,
 		DEF:      5,
-		EXP:      40,
+		EXP:      28,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -126,7 +126,7 @@ func NewDarkWizard(x, y int) *Monster {
 		MaxHP:    46,
 		ATK:      17,
 		DEF:      4,
-		EXP:      60,
+		EXP:      50,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -152,7 +152,7 @@ func NewMimic(x, y int) *Monster {
 		MaxHP:    45,
 		ATK:      14,
 		DEF:      5,
-		EXP:      45,
+		EXP:      35,
 		IsBoss:   false,
 		Alerted:  true,
 		Sprite:   sprite,
@@ -177,7 +177,7 @@ func NewEnragedShopkeeper(x, y int) *Monster {
 		MaxHP:    90,
 		ATK:      17,
 		DEF:      6,
-		EXP:      150,
+		EXP:      120,
 		IsBoss:   true,
 		IsMerchant: true,
 		Alerted:  true,
@@ -205,7 +205,7 @@ func NewDragonBoss(x, y int) *Monster {
 		MaxHP:    200,
 		ATK:      24,
 		DEF:      9,
-		EXP:      400,
+		EXP:      300,
 		IsBoss:   true,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -265,7 +265,7 @@ func GenerateRandomMonster(x, y, floor int, rng *rand.Rand) *Monster {
 		m.Name = fmt.Sprintf("%s %s", m.Affix, m.Name)
 		m.MaxHP = int(float64(m.MaxHP) * 1.3)
 		m.HP = m.MaxHP
-		m.EXP = int(float64(m.EXP) * 1.4)
+		m.EXP = int(float64(m.EXP) * 1.3)
 
 		switch m.Affix {
 		case "[Fiery]":
