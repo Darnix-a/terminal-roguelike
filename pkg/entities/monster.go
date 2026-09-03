@@ -46,11 +46,11 @@ func NewGoblin(x, y int) *Monster {
 	}
 	return &Monster{
 		Entity:   NewEntity("goblin", "Goblin Scout", 'g', tcell.ColorGreen, x, y, true),
-		HP:       14,
-		MaxHP:    14,
+		HP:       18,
+		MaxHP:    18,
 		ATK:      5,
-		DEF:      1,
-		EXP:      25,
+		DEF:      2,
+		EXP:      12,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -71,11 +71,11 @@ func NewSkeleton(x, y int) *Monster {
 	}
 	return &Monster{
 		Entity:   NewEntity("skeleton", "Skeletal Guard", 's', tcell.ColorWhite, x, y, true),
-		HP:       22,
-		MaxHP:    22,
-		ATK:      8,
-		DEF:      3,
-		EXP:      45,
+		HP:       32,
+		MaxHP:    32,
+		ATK:      9,
+		DEF:      4,
+		EXP:      22,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -96,11 +96,11 @@ func NewOrc(x, y int) *Monster {
 	}
 	return &Monster{
 		Entity:   NewEntity("orc", "Orc Berserker", 'o', tcell.ColorOlive, x, y, true),
-		HP:       38,
-		MaxHP:    38,
-		ATK:      12,
-		DEF:      4,
-		EXP:      70,
+		HP:       52,
+		MaxHP:    52,
+		ATK:      14,
+		DEF:      5,
+		EXP:      40,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -122,11 +122,11 @@ func NewDarkWizard(x, y int) *Monster {
 	}
 	return &Monster{
 		Entity:   NewEntity("dark_wizard", "Dark Sorcerer", 'w', tcell.ColorPurple, x, y, true),
-		HP:       36,
-		MaxHP:    36,
-		ATK:      15,
-		DEF:      3,
-		EXP:      95,
+		HP:       46,
+		MaxHP:    46,
+		ATK:      17,
+		DEF:      4,
+		EXP:      60,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -148,11 +148,11 @@ func NewMimic(x, y int) *Monster {
 	}
 	return &Monster{
 		Entity:   NewEntity("mimic", "Hungry Mimic", 'M', tcell.ColorGold, x, y, true),
-		HP:       38,
-		MaxHP:    38,
-		ATK:      13,
-		DEF:      4,
-		EXP:      80,
+		HP:       45,
+		MaxHP:    45,
+		ATK:      14,
+		DEF:      5,
+		EXP:      45,
 		IsBoss:   false,
 		Alerted:  true,
 		Sprite:   sprite,
@@ -173,12 +173,12 @@ func NewEnragedShopkeeper(x, y int) *Monster {
 	}
 	return &Monster{
 		Entity:   NewEntity("shopkeeper_boss", "Enraged Shopkeeper", 'S', tcell.ColorGold, x, y, true),
-		HP:       70,
-		MaxHP:    70,
-		ATK:      16,
-		DEF:      5,
-		EXP:      200,
-		IsBoss:   false,
+		HP:       90,
+		MaxHP:    90,
+		ATK:      17,
+		DEF:      6,
+		EXP:      150,
+		IsBoss:   true,
 		IsMerchant: true,
 		Alerted:  true,
 		Sprite:   sprite,
@@ -188,86 +188,74 @@ func NewEnragedShopkeeper(x, y int) *Monster {
 
 func NewDragonBoss(x, y int) *Monster {
 	sprite := []string{
-		`    /\__/\    `,
-		`   / O  O \   `,
-		`  =(  --  )=  `,
-		`  /| ==== |\  `,
-		` / |======| \ `,
-		`    /    \    `,
+		`  / \  //\    `,
+		` <^.^> (oo)   `,
+		` /|/ \ |/ | \ `,
+		`   / / \ \    `,
 	}
 	actions := []MonsterAction{
-		{Name: "Dragon Claws", DamageMult: 1.3, Description: "rakes with fiery dragon claws"},
-		{Name: "Tail Slam", DamageMult: 1.4, Description: "whips its colossal spiked tail against you"},
-		{Name: "Inferno Breath", DamageMult: 2.2, IsMagic: true, IsTelegraphed: true, TelegraphWarning: "takes a massive breath, glowing with searing infernal MAGMA!", Description: "breathes a catastrophic inferno across the arena"},
-		{Name: "Cataclysm Roar", DamageMult: 2.0, IsTelegraphed: true, TelegraphWarning: "rears back to unleash a world-shattering CATACLYSM ROAR!", Description: "unleashes a roar of pure annihilation"},
+		{Name: "Dragon Claw", DamageMult: 1.2, Description: "rakes with razor-sharp obsidian talons"},
+		{Name: "Inferno Breath", DamageMult: 2.2, IsMagic: true, IsTelegraphed: true, TelegraphWarning: "inhales deeply... INFERNO BREATH incoming!", Description: "unleashes an apocalyptic torrent of scorching dragonfire"},
+		{Name: "Tail Sweep", DamageMult: 1.4, Description: "swipes with its massive spiked tail"},
+		{Name: "Cataclysm Roar", DamageMult: 2.5, IsMagic: true, IsTelegraphed: true, TelegraphWarning: "gathers draconic thunder for a CATACLYSM ROAR!", Description: "shatters the dungeon walls with a terrifying shockwave"},
 	}
 	return &Monster{
-		Entity:   NewEntity("dragon_boss", "Ancient Red Dragon", 'D', tcell.ColorRed, x, y, true),
-		HP:       140,
-		MaxHP:    140,
-		ATK:      20,
-		DEF:      7,
-		EXP:      500,
+		Entity:   NewEntity("dragon", "Ancient Red Dragon", 'D', tcell.ColorRed, x, y, true),
+		HP:       200,
+		MaxHP:    200,
+		ATK:      24,
+		DEF:      9,
+		EXP:      400,
 		IsBoss:   true,
-		Alerted:  true,
+		Alerted:  false,
 		Sprite:   sprite,
 		Actions:  actions,
 	}
 }
 
-// GenerateRandomMonster spawns monsters scaled smoothly to dungeon floor
+// GenerateRandomMonster spawns an appropriate monster for the floor level
 func GenerateRandomMonster(x, y, floor int, rng *rand.Rand) *Monster {
 	var m *Monster
-	roll := rng.Intn(100)
 
-	switch {
-	case floor >= 4:
-		if roll < 45 {
-			m = NewDarkWizard(x, y)
-		} else if roll < 80 {
-			m = NewOrc(x, y)
-		} else {
-			m = NewSkeleton(x, y)
-		}
-
-	case floor >= 3:
-		if roll < 50 {
-			m = NewOrc(x, y)
-		} else if roll < 80 {
+	switch floor {
+	case 1:
+		// Floor 1: Exclusively Goblin Scouts
+		m = NewGoblin(x, y)
+	case 2:
+		// Floor 2: 70% Skeletons, 30% Goblins
+		if rng.Intn(100) < 70 {
 			m = NewSkeleton(x, y)
 		} else {
 			m = NewGoblin(x, y)
 		}
-
-	case floor >= 2:
+	case 3:
+		// Floor 3: 60% Orcs, 30% Skeletons, 10% Goblins
+		roll := rng.Intn(100)
 		if roll < 60 {
+			m = NewOrc(x, y)
+		} else if roll < 90 {
 			m = NewSkeleton(x, y)
 		} else {
 			m = NewGoblin(x, y)
 		}
-
-	default: // Floor 1: Exclusively Goblin Scouts for a balanced onboarding
+	case 4:
+		// Floor 4: 50% Sorcerers, 35% Orcs, 15% Skeletons
+		roll := rng.Intn(100)
+		if roll < 50 {
+			m = NewDarkWizard(x, y)
+		} else if roll < 85 {
+			m = NewOrc(x, y)
+		} else {
+			m = NewSkeleton(x, y)
+		}
+	default:
 		m = NewGoblin(x, y)
 	}
 
-	// Smooth progressive floor stat bonuses
-	if floor > 1 {
-		floorBonusHP := (floor - 1) * 3
-		floorBonusATK := (floor - 1) * 1
-		floorBonusDEF := (floor - 1) / 2
-		floorBonusEXP := (floor - 1) * 8
-
-		m.MaxHP += floorBonusHP
-		m.HP = m.MaxHP
-		m.ATK += floorBonusATK
-		m.DEF += floorBonusDEF
-		m.EXP += floorBonusEXP
-	}
-
-	// Champion spawn chance scales smoothly (10% on F1 up to 25% on F4+)
-	champChance := 10 + (floor * 3)
-	if champChance > 25 {
-		champChance = 25
+	// Champion spawn chance (10% to 20%)
+	champChance := 10 + (floor * 2)
+	if champChance > 20 {
+		champChance = 20
 	}
 
 	if rng.Intn(100) < champChance {
@@ -277,7 +265,7 @@ func GenerateRandomMonster(x, y, floor int, rng *rand.Rand) *Monster {
 		m.Name = fmt.Sprintf("%s %s", m.Affix, m.Name)
 		m.MaxHP = int(float64(m.MaxHP) * 1.3)
 		m.HP = m.MaxHP
-		m.EXP = int(float64(m.EXP) * 1.5)
+		m.EXP = int(float64(m.EXP) * 1.4)
 
 		switch m.Affix {
 		case "[Fiery]":
@@ -288,7 +276,7 @@ func GenerateRandomMonster(x, y, floor int, rng *rand.Rand) *Monster {
 			m.ATK += 2
 		case "[Armored]":
 			m.Color = tcell.ColorSilver
-			m.DEF += 3
+			m.DEF += 2
 		case "[Frenzied]":
 			m.Color = tcell.ColorMediumPurple
 			m.ATK += 3

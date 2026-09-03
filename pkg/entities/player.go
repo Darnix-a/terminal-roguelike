@@ -67,7 +67,7 @@ func NewPlayer(x, y int) *Player {
 		BaseDEF:        2,
 		Level:          1,
 		EXP:            0,
-		MaxEXP:         35,
+		MaxEXP:         60,
 		Gold:           0,
 		Keys:           0,
 		Kills:          0,
@@ -122,16 +122,18 @@ func (p *Player) GainEXP(amount int) (bool, []string) {
 		p.EXP -= p.MaxEXP
 		p.Level++
 		leveledUp = true
-		p.MaxEXP = int(float64(p.MaxEXP) * 1.5)
-		p.MaxHP += 10
+		p.MaxEXP = int(float64(p.MaxEXP) * 1.8)
+		p.MaxHP += 6
 		p.HP = p.MaxHP
-		p.MaxMP += 5
+		p.MaxMP += 3
 		p.MP = p.MaxMP
-		p.BaseATK += 2
-		p.BaseDEF += 1
+		p.BaseATK += 1
+		if p.Level%2 == 0 {
+			p.BaseDEF += 1
+		}
 
 		messages = append(messages, fmt.Sprintf("🌟 LEVEL UP! You reached Level %d!", p.Level))
-		messages = append(messages, fmt.Sprintf("Stats: Max HP +10 (%d), Max MP +5 (%d), ATK +2 (%d), DEF +1 (%d)!", p.MaxHP, p.MaxMP, p.TotalATK(), p.TotalDEF()))
+		messages = append(messages, fmt.Sprintf("Stats: Max HP +6 (%d), Max MP +3 (%d), ATK +1 (%d), DEF (%d)!", p.MaxHP, p.MaxMP, p.TotalATK(), p.TotalDEF()))
 	}
 
 	return leveledUp, messages
