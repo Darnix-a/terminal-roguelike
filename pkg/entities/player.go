@@ -8,30 +8,24 @@ import (
 	"terminal-roguelike/pkg/items"
 )
 
-type Skill struct {
-	ID          string
-	Name        string
-	MPCost      int
-	Description string
-}
-
 type Player struct {
 	*Entity
-	HP        int
-	MaxHP     int
-	MP        int
-	MaxMP     int
-	BaseATK   int
-	BaseDEF   int
-	Level     int
-	EXP       int
-	MaxEXP    int
-	Gold      int
-	Keys      int
-	Kills     int
-	Guarding  bool
-	Skills    []Skill
-	Inventory *items.Inventory
+	HP             int
+	MaxHP          int
+	MP             int
+	MaxMP          int
+	BaseATK        int
+	BaseDEF        int
+	Level          int
+	EXP            int
+	MaxEXP         int
+	Gold           int
+	Keys           int
+	Kills          int
+	Guarding       bool
+	GuaranteedCrit bool
+	Skills         []Skill
+	Inventory      *items.Inventory
 }
 
 func NewPlayer(x, y int) *Player {
@@ -57,30 +51,30 @@ func NewPlayer(x, y int) *Player {
 	pot2.Description = "Restores 30 HP"
 	_ = inv.Add(pot2)
 
-	skills := []Skill{
-		{ID: "heavy_slash", Name: "Heavy Slash", MPCost: 5, Description: "Cleave strike that pierces 50% enemy DEF"},
-		{ID: "fireball", Name: "Fireball", MPCost: 7, Description: "Blast enemy with high mystical fire damage"},
-		{ID: "shield_guard", Name: "Shield Guard", MPCost: 3, Description: "Brace stance that absorbs 75% incoming damage"},
-		{ID: "holy_heal", Name: "Holy Heal", MPCost: 8, Description: "Chants sacred prayer restoring 35 HP"},
+	// Hero starts with 2 basic skills (Heavy Slash and Shield Guard)
+	starterSkills := []Skill{
+		SkillRegistry[0], // Heavy Slash
+		SkillRegistry[1], // Shield Guard
 	}
 
 	return &Player{
-		Entity:    NewEntity("player", "Hero", '@', tcell.ColorYellow, x, y, true),
-		HP:        50,
-		MaxHP:     50,
-		MP:        30,
-		MaxMP:     30,
-		BaseATK:   6,
-		BaseDEF:   2,
-		Level:     1,
-		EXP:       0,
-		MaxEXP:    35,
-		Gold:      0,
-		Keys:      0,
-		Kills:     0,
-		Guarding:  false,
-		Skills:    skills,
-		Inventory: inv,
+		Entity:         NewEntity("player", "Hero", '@', tcell.ColorYellow, x, y, true),
+		HP:             50,
+		MaxHP:          50,
+		MP:             30,
+		MaxMP:          30,
+		BaseATK:        6,
+		BaseDEF:        2,
+		Level:          1,
+		EXP:            0,
+		MaxEXP:         35,
+		Gold:           0,
+		Keys:           0,
+		Kills:          0,
+		Guarding:       false,
+		GuaranteedCrit: false,
+		Skills:         starterSkills,
+		Inventory:      inv,
 	}
 }
 
@@ -110,13 +104,24 @@ func (p *Player) RestoreMP(amount int) int {
 	return p.MP - prev
 }
 
-func (p *Player) GainEXP(amount int) []string {
+func (p *Player) LearnSkill(skill Skill) {
+	for _, s := range p.Skills {
+		if s.ID == skill.ID {
+			return
+		}
+	}
+	p.Skills = append(p.Skills, skill)
+}
+
+func (p *Player) GainEXP(amount int) (bool, []string) {
 	p.EXP += amount
 	messages := make([]string, 0)
+	leveledUp := false
 
 	for p.EXP >= p.MaxEXP {
 		p.EXP -= p.MaxEXP
 		p.Level++
+		leveledUp = true
 		p.MaxEXP = int(float64(p.MaxEXP) * 1.5)
 		p.MaxHP += 10
 		p.HP = p.MaxHP
@@ -126,8 +131,8 @@ func (p *Player) GainEXP(amount int) []string {
 		p.BaseDEF += 1
 
 		messages = append(messages, fmt.Sprintf("🌟 LEVEL UP! You reached Level %d!", p.Level))
-		messages = append(messages, fmt.Sprintf("Stats Increased: Max HP +10 (%d), Max MP +5 (%d), ATK +2 (%d), DEF +1 (%d)!", p.MaxHP, p.MaxMP, p.TotalATK(), p.TotalDEF()))
+		messages = append(messages, fmt.Sprintf("Stats: Max HP +10 (%d), Max MP +5 (%d), ATK +2 (%d), DEF +1 (%d)!", p.MaxHP, p.MaxMP, p.TotalATK(), p.TotalDEF()))
 	}
 
-	return messages
+	return leveledUp, messages
 }

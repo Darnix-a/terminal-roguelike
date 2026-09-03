@@ -23,9 +23,9 @@ func TestPlayerLevelUpAndHealing(t *testing.T) {
 	}
 
 	// Level up
-	msgs := player.GainEXP(player.MaxEXP)
-	if len(msgs) == 0 {
-		t.Errorf("Expected level up messages, got none")
+	leveledUp, msgs := player.GainEXP(player.MaxEXP)
+	if !leveledUp || len(msgs) == 0 {
+		t.Errorf("Expected level up to be true with messages")
 	}
 
 	if player.Level != 2 {
@@ -38,5 +38,15 @@ func TestPlayerLevelUpAndHealing(t *testing.T) {
 
 	if player.BaseATK <= initialATK {
 		t.Errorf("Expected BaseATK to increase after level up")
+	}
+
+	// Test Learn Skill
+	initialSkills := len(player.Skills)
+	unlearned := GetUnlearnedSkills(player.Skills)
+	if len(unlearned) > 0 {
+		player.LearnSkill(unlearned[0])
+		if len(player.Skills) != initialSkills+1 {
+			t.Errorf("Expected skills count %d, got %d", initialSkills+1, len(player.Skills))
+		}
 	}
 }

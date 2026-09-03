@@ -158,3 +158,34 @@ func RenderShopModal(screen tcell.Screen, g *engine.Game) {
 	DrawText(screen, x1+3, y1+11, tcell.StyleDefault.Foreground(tcell.ColorOrangeRed), "[A] Provoke / Attack the Merchant")
 	DrawText(screen, x1+3, y1+13, tcell.StyleDefault.Foreground(tcell.ColorYellow), "Press [1-5] to Buy | [A] Attack | [Esc/q] Leave Shop")
 }
+
+// RenderLevelUpModal renders the skill choice level-up modal
+func RenderLevelUpModal(screen tcell.Screen, g *engine.Game) {
+	sw, sh := screen.Size()
+	w, h := 64, 16
+	x1 := (sw - w) / 2
+	y1 := (sh - h) / 2
+	x2 := x1 + w
+	y2 := y1 + h
+
+	for x := x1; x <= x2; x++ {
+		for y := y1; y <= y2; y++ {
+			screen.SetContent(x, y, ' ', nil, tcell.StyleDefault.Background(tcell.ColorBlack))
+		}
+	}
+
+	title := fmt.Sprintf("🌟 LEVEL UP! CHOOSE A NEW SKILL (Level %d)", g.Player.Level)
+	DrawBox(screen, x1, y1, x2, y2, tcell.StyleDefault.Foreground(tcell.ColorGold).Bold(true), title)
+
+	DrawText(screen, x1+3, y1+2, tcell.StyleDefault.Foreground(tcell.ColorYellow), "Your mastery expands! Select a new ability to learn:")
+
+	for i, sk := range g.OfferedSkills {
+		rowY := y1 + 4 + (i * 3)
+		nameLine := fmt.Sprintf("[%d] %s (%d MP)", i+1, sk.Name, sk.MPCost)
+		DrawText(screen, x1+4, rowY, tcell.StyleDefault.Foreground(tcell.ColorAqua).Bold(true), nameLine)
+		DrawText(screen, x1+8, rowY+1, tcell.StyleDefault.Foreground(tcell.ColorLightGray), sk.Description)
+	}
+
+	prompt := fmt.Sprintf("Press [1-%d] to Learn Skill", len(g.OfferedSkills))
+	DrawText(screen, (sw-len(prompt))/2, y2-2, tcell.StyleDefault.Foreground(tcell.ColorGold), prompt)
+}

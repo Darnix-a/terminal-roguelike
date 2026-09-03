@@ -133,16 +133,16 @@ func RenderBattleScreen(screen tcell.Screen, battle *combat.Battle) {
 			DrawText(screen, menuX, bottomY+5, tcell.StyleDefault.Foreground(tcell.ColorYellow), "[4] Flee Battle")
 
 		case combat.MenuSkills:
-			DrawText(screen, menuX, bottomY+1, tcell.StyleDefault.Foreground(tcell.ColorAqua).Bold(true), "--- MAGIC SKILLS (Press 1-4) ---")
+			DrawText(screen, menuX, bottomY+1, tcell.StyleDefault.Foreground(tcell.ColorAqua).Bold(true), fmt.Sprintf("--- MAGIC SKILLS (Press 1-%d) ---", len(player.Skills)))
 			for i, sk := range player.Skills {
 				costColor := tcell.ColorAqua
 				if player.MP < sk.MPCost {
 					costColor = tcell.ColorDarkGray
 				}
-				line := fmt.Sprintf("[%d] %s (%d MP) - %s", i+1, sk.Name, sk.MPCost, sk.Description)
+				line := fmt.Sprintf("[%d] %s (%d MP)", i+1, sk.Name, sk.MPCost)
 				DrawText(screen, menuX, bottomY+2+i, tcell.StyleDefault.Foreground(costColor), line)
 			}
-			DrawText(screen, menuX, bottomY+6, tcell.StyleDefault.Foreground(tcell.ColorDarkGray), "[Esc] Back to Actions")
+			DrawText(screen, menuX, sh-2, tcell.StyleDefault.Foreground(tcell.ColorDarkGray), "[Esc] Back to Actions")
 
 		case combat.MenuItems:
 			DrawText(screen, menuX, bottomY+1, tcell.StyleDefault.Foreground(tcell.ColorLightGreen).Bold(true), "--- POTIONS (Press a-z) ---")

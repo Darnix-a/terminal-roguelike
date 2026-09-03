@@ -40,6 +40,7 @@ type Battle struct {
 	Result            BattleResult
 	Log               []BattleMessage
 	LevelUpMsgs       []string
+	LeveledUp         bool
 	SelectedSlot      int
 	TelegraphedAction *entities.MonsterAction
 }
@@ -52,6 +53,8 @@ func NewBattle(player *entities.Player, monster *entities.Monster, rng *rand.Ran
 		SubMenu:           MenuMain,
 		Result:            BattleOngoing,
 		Log:               make([]BattleMessage, 0),
+		LevelUpMsgs:       make([]string, 0),
+		LeveledUp:         false,
 		SelectedSlot:      0,
 		TelegraphedAction: nil,
 	}
@@ -78,15 +81,19 @@ func (b *Battle) PlayerAttack() {
 		baseDmg = 1
 	}
 
-	// Critical check (15%)
-	isCrit := b.RNG.Intn(100) < 15
+	// Critical check (15% base, or 100% if GuaranteedCrit)
+	isCrit := b.RNG.Intn(100) < 15 || b.Player.GuaranteedCrit
+	if b.Player.GuaranteedCrit {
+		b.Player.GuaranteedCrit = false
+	}
+
 	dmg := baseDmg + (b.RNG.Intn(3) - 1)
 	if isCrit {
-		dmg = int(float64(dmg) * 1.5)
-		if dmg < 2 {
-			dmg = 2
+		dmg = int(float64(dmg) * 1.6)
+		if dmg < 3 {
+			dmg = 3
 		}
-		b.AddLog(fmt.Sprintf("CRITICAL STRIKE! You hit %s for %d damage!", b.Monster.Name, dmg), tcell.ColorYellow)
+		b.AddLog(fmt.Sprintf("⚡ CRITICAL STRIKE! You strike %s for %d damage!", b.Monster.Name, dmg), tcell.ColorYellow)
 	} else {
 		b.AddLog(fmt.Sprintf("You strike %s for %d damage.", b.Monster.Name, dmg), tcell.ColorWhite)
 	}
@@ -115,26 +122,91 @@ func (b *Battle) PlayerUseSkill(skillIdx int) {
 
 	switch skill.ID {
 	case "heavy_slash":
-		dmg := int(float64(b.Player.TotalATK()) * 1.8) - (b.Monster.DEF / 2)
+		dmg := int(float64(b.Player.TotalATK()) * 1.8) - (b.Monster.DEF / 2) + b.RNG.Intn(3)
 		if dmg < 4 {
 			dmg = 4
 		}
-		dmg += b.RNG.Intn(3)
 		b.Monster.HP -= dmg
 		b.AddLog(fmt.Sprintf("💥 Heavy Slash! You cleave %s for %d physical damage!", b.Monster.Name, dmg), tcell.ColorOrangeRed)
+
+	case "shield_guard":
+		b.Player.Guarding = true
+		b.AddLog("🛡️ Shield Stance! You brace yourself, absorbing 75% incoming damage.", tcell.ColorSkyblue)
 
 	case "fireball":
 		dmg := 16 + (b.Player.Level * 4) + b.RNG.Intn(4)
 		b.Monster.HP -= dmg
 		b.AddLog(fmt.Sprintf("🔥 Fireball! Incinerating flames blast %s for %d magic damage!", b.Monster.Name, dmg), tcell.ColorOrange)
 
-	case "shield_guard":
-		b.Player.Guarding = true
-		b.AddLog("🛡️ Shield Stance! You brace yourself, absorbing 75% incoming damage.", tcell.ColorSkyblue)
-
 	case "holy_heal":
 		healed := b.Player.Heal(35)
 		b.AddLog(fmt.Sprintf("✨ Holy Light! Restored %d HP! (Current HP: %d/%d)", healed, b.Player.HP, b.Player.MaxHP), tcell.ColorGreen)
+
+	case "chain_lightning":
+		dmg := 18 + (b.Player.Level * 4) + b.RNG.Intn(5)
+		b.Monster.HP -= dmg
+		b.AddLog(fmt.Sprintf("⚡ Chain Lightning! Piercing electric bolts shock %s for %d TRUE damage (ignores DEF)!", b.Monster.Name, dmg), tcell.ColorAqua)
+
+	case "frost_nova":
+		dmg := 12 + (b.Player.Level * 3)
+		b.Monster.HP -= dmg
+		if b.Monster.ATK > 3 {
+			b.Monster.ATK -= 3
+		}
+		b.AddLog(fmt.Sprintf("❄️ Frost Nova! Glacial ice chills %s for %d magic damage and weakens their ATK by -3!", b.Monster.Name, dmg), tcell.ColorSkyblue)
+
+	case "vampiric_strike":
+		dmg := int(float64(b.Player.TotalATK()) * 1.4) - b.Monster.DEF + b.RNG.Intn(3)
+		if dmg < 3 {
+			dmg = 3
+		}
+		b.Monster.HP -= dmg
+		leech := dmg / 2
+		if leech > 0 {
+			b.Player.Heal(leech)
+		}
+		b.AddLog(fmt.Sprintf("🩸 Vampiric Strike! Slashed %s for %d damage and drained +%d HP!", b.Monster.Name, dmg, leech), tcell.ColorCrimson)
+
+	case "berserker_rage":
+		b.Player.HP -= 6
+		if b.Player.HP < 1 {
+			b.Player.HP = 1
+		}
+		dmg := int(float64(b.Player.TotalATK()) * 2.4) - b.Monster.DEF + b.RNG.Intn(4)
+		if dmg < 6 {
+			dmg = 6
+		}
+		b.Monster.HP -= dmg
+		b.AddLog(fmt.Sprintf("🩸 Berserker Rage! Sacrificed 6 HP to smash %s for a massive %d damage!", b.Monster.Name, dmg), tcell.ColorRed)
+
+	case "poison_blade":
+		dmg := int(float64(b.Player.TotalATK()) * 1.2) - b.Monster.DEF + 12
+		if dmg < 6 {
+			dmg = 6
+		}
+		b.Monster.HP -= dmg
+		b.AddLog(fmt.Sprintf("🧪 Poison Blade! Struck %s with deadly toxin for %d venom damage!", b.Monster.Name, dmg), tcell.ColorGreen)
+
+	case "smoke_bomb":
+		b.Player.Guarding = true
+		b.Player.GuaranteedCrit = true
+		b.AddLog("💨 Smoke Bomb! Blinded enemy and primed next attack for GUARANTEED CRITICAL STRIKE!", tcell.ColorViolet)
+
+	case "divine_smite":
+		dmg := int(float64(b.Player.TotalATK()) * 2.8) - (b.Monster.DEF / 3) + b.RNG.Intn(5)
+		if dmg < 10 {
+			dmg = 10
+		}
+		b.Monster.HP -= dmg
+		b.AddLog(fmt.Sprintf("👑 DIVINE SMITE! Celestial light smites %s for a devastating %d holy damage!", b.Monster.Name, dmg), tcell.ColorGold)
+
+	case "mana_surge":
+		b.Player.HP -= 8
+		if b.Player.HP < 1 {
+			b.Player.HP = 1
+		}
+		b.Player.RestoreMP(20)
+		b.AddLog(fmt.Sprintf("✨ Mana Surge! Sacrificed 8 HP to restore +20 MP! (MP: %d/%d)", b.Player.MP, b.Player.MaxMP), tcell.ColorAqua)
 	}
 
 	b.SubMenu = MenuMain
@@ -206,24 +278,21 @@ func (b *Battle) EnemyTurn() {
 		b.TelegraphedAction = nil
 		isTelegraphedExecution = true
 	} else {
-		// Pick action
 		picked := b.Monster.Actions[0]
 		if len(b.Monster.Actions) > 1 {
 			picked = b.Monster.Actions[b.RNG.Intn(len(b.Monster.Actions))]
 		}
 
-		// Check if this action should be telegraphed 1 turn ahead
 		if picked.IsTelegraphed && b.RNG.Intn(100) < 65 {
 			b.TelegraphedAction = &picked
 			warningMsg := fmt.Sprintf("⚠️ WARNING: %s %s (Shield Guard next turn!)", b.Monster.Name, picked.TelegraphWarning)
 			b.AddLog(warningMsg, tcell.ColorOrangeRed)
-			return // Monster spends this turn charging
+			return // Monster spends turn charging
 		}
 
 		action = picked
 	}
 
-	// Calculate damage
 	rawDmg := float64(b.Monster.ATK) * action.DamageMult
 	var finalDmg int
 
@@ -237,7 +306,6 @@ func (b *Battle) EnemyTurn() {
 		finalDmg = 1
 	}
 
-	// Champion Affix Effects
 	if b.Monster.IsChampion {
 		switch b.Monster.Affix {
 		case "[Fiery]":
@@ -249,7 +317,6 @@ func (b *Battle) EnemyTurn() {
 		}
 	}
 
-	// If player is guarding -> 75% reduction
 	if b.Player.Guarding {
 		finalDmg = int(float64(finalDmg) * 0.25)
 		if finalDmg < 1 {
@@ -257,19 +324,18 @@ func (b *Battle) EnemyTurn() {
 		}
 		b.Player.Guarding = false
 		if isTelegraphedExecution {
-			b.AddLog(fmt.Sprintf("🛡️ PERFECT DEFLECTION! You shielded against %s's %s! (Took only %d damage)", b.Monster.Name, action.Name, finalDmg), tcell.ColorGreen)
+			b.AddLog(fmt.Sprintf("🛡️ PERFECT DEFLECTION! Shielded %s's %s! (Took %d damage)", b.Monster.Name, action.Name, finalDmg), tcell.ColorGreen)
 		} else {
-			b.AddLog(fmt.Sprintf("🛡️ Your shield absorbed the blow! %s deals only %d damage with %s.", b.Monster.Name, finalDmg, action.Name), tcell.ColorSkyblue)
+			b.AddLog(fmt.Sprintf("🛡️ Shield absorbed blow! %s deals only %d damage.", b.Monster.Name, finalDmg), tcell.ColorSkyblue)
 		}
 	} else {
 		if isTelegraphedExecution {
-			b.AddLog(fmt.Sprintf("💥 DIRECT HIT! %s unleashes %s! (Heavy %d damage!)", b.Monster.Name, action.Name, finalDmg), tcell.ColorRed)
+			b.AddLog(fmt.Sprintf("💥 DIRECT HIT! %s strikes with %s! (%d damage!)", b.Monster.Name, action.Name, finalDmg), tcell.ColorRed)
 		} else {
 			b.AddLog(fmt.Sprintf("%s uses %s! %s (Deals %d damage)", b.Monster.Name, action.Name, action.Description, finalDmg), tcell.ColorRed)
 		}
 	}
 
-	// Vampiric Lifesteal
 	if b.Monster.IsChampion && b.Monster.Affix == "[Vampiric]" {
 		leech := finalDmg / 2
 		if leech > 0 {
@@ -277,7 +343,7 @@ func (b *Battle) EnemyTurn() {
 			if b.Monster.HP > b.Monster.MaxHP {
 				b.Monster.HP = b.Monster.MaxHP
 			}
-			b.AddLog(fmt.Sprintf("🩸 Vampiric Drain! %s heals +%d HP from your wounds!", b.Monster.Name, leech), tcell.ColorCrimson)
+			b.AddLog(fmt.Sprintf("🩸 Vampiric Drain! %s heals +%d HP!", b.Monster.Name, leech), tcell.ColorCrimson)
 		}
 	}
 
@@ -298,8 +364,9 @@ func (b *Battle) checkMonsterDead() bool {
 
 		b.AddLog(fmt.Sprintf("🎉 VICTORY! %s was defeated! Gained +%d EXP!", b.Monster.Name, b.Monster.EXP), tcell.ColorGold)
 
-		// Level up check
-		b.LevelUpMsgs = b.Player.GainEXP(b.Monster.EXP)
+		leveledUp, msgs := b.Player.GainEXP(b.Monster.EXP)
+		b.LeveledUp = leveledUp
+		b.LevelUpMsgs = msgs
 		for _, msg := range b.LevelUpMsgs {
 			b.AddLog(msg, tcell.ColorAqua)
 		}

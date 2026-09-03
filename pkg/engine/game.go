@@ -21,6 +21,7 @@ const (
 	StateInventory
 	StateShop
 	StateCombat
+	StateLevelUp
 	StateHighScores
 	StateHelp
 	StateGameOver
@@ -44,6 +45,7 @@ type Game struct {
 	MapH             int
 	ActiveBattle     *combat.Battle
 	ActiveMerchant   *entities.Monster
+	OfferedSkills    []entities.Skill
 	LastPlayerX      int
 	LastPlayerY      int
 	TutorialTriggers map[string]bool
@@ -473,9 +475,14 @@ func (g *Game) ConcludeBattle() {
 			return
 		}
 
-		g.State = StatePlaying
 		if g.Floor > 0 {
 			SaveGameProgress(g)
+		}
+
+		if g.ActiveBattle.LeveledUp {
+			g.CheckLevelUpChoices()
+		} else {
+			g.State = StatePlaying
 		}
 
 	case combat.BattleDefeat:
@@ -501,6 +508,29 @@ func (g *Game) ConcludeBattle() {
 
 	g.ActiveBattle = nil
 	g.Map.ComputeFOV(g.Player.X, g.Player.Y, g.FOVRadius)
+}
+
+func (g *Game) CheckLevelUpChoices() {
+	choices := entities.PickRandomSkillChoices(g.Player.Skills, g.RNG)
+	if len(choices) > 0 {
+		g.OfferedSkills = choices
+		g.State = StateLevelUp
+	} else {
+		g.State = StatePlaying
+	}
+}
+
+func (g *Game) SelectLevelUpSkill(choiceIdx int) {
+	if choiceIdx >= 0 && choiceIdx < len(g.OfferedSkills) {
+		picked := g.OfferedSkills[choiceIdx]
+		g.Player.LearnSkill(picked)
+		g.Log.Add(fmt.Sprintf("🌟 You mastered a new ability: %s (%d MP)!", picked.Name, picked.MPCost), tcell.ColorAqua)
+		g.OfferedSkills = nil
+		g.State = StatePlaying
+		if g.Floor > 0 {
+			SaveGameProgress(g)
+		}
+	}
 }
 
 // BuyShopItem handles purchasing wares from Merchant

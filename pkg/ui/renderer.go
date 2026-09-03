@@ -291,6 +291,8 @@ func Render(screen tcell.Screen, g *engine.Game) {
 		RenderInventoryModal(screen, g)
 	case engine.StateShop:
 		RenderShopModal(screen, g)
+	case engine.StateLevelUp:
+		RenderLevelUpModal(screen, g)
 	case engine.StateGameOver:
 		RenderGameOverModal(screen, g)
 	case engine.StateVictory:

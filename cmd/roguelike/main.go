@@ -161,7 +161,7 @@ func main() {
 						battle.SubMenu = combat.MenuMain
 					} else {
 						r := ev.Rune()
-						if r >= '1' && r <= '4' {
+						if r >= '1' && r <= '9' {
 							skillIdx := int(r - '1')
 							battle.PlayerUseSkill(skillIdx)
 						}
@@ -179,7 +179,17 @@ func main() {
 					}
 				}
 
-			// 5. INVENTORY MODAL (Arrow Key / WASD navigation)
+			// 5. LEVEL UP SKILL CHOICE MODAL
+			case engine.StateLevelUp:
+				r := ev.Rune()
+				if r >= '1' && r <= '3' {
+					choiceIdx := int(r - '1')
+					game.SelectLevelUpSkill(choiceIdx)
+				} else if ev.Key() == tcell.KeyEscape {
+					game.State = engine.StatePlaying
+				}
+
+			// 6. INVENTORY MODAL (Arrow Key / WASD navigation)
 			case engine.StateInventory:
 				invCount := len(game.Player.Inventory.Items)
 
@@ -230,7 +240,7 @@ func main() {
 					}
 				}
 
-			// 6. DUNGEON SHOP
+			// 7. DUNGEON SHOP
 			case engine.StateShop:
 				if ev.Key() == tcell.KeyEscape || ev.Rune() == 'q' || ev.Rune() == 'Q' {
 					game.State = engine.StatePlaying
@@ -248,7 +258,7 @@ func main() {
 					game.BuyShopItem(slotIdx)
 				}
 
-			// 7. PLAYING (DUNGEON EXPLORATION)
+			// 8. PLAYING (DUNGEON EXPLORATION)
 			case engine.StatePlaying:
 				switch ev.Key() {
 				case tcell.KeyUp:
