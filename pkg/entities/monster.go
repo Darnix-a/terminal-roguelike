@@ -23,7 +23,7 @@ type Monster struct {
 	EXP        int
 	IsBoss     bool
 	IsChampion bool
-	Affix      string // "[Fiery]", "[Vampiric]", "[Armored]", "[Frenzied]"
+	Affix      string
 	Alerted    bool
 	Guarding   bool
 	Sprite     []string
@@ -38,16 +38,16 @@ func NewGoblin(x, y int) *Monster {
 	}
 	actions := []MonsterAction{
 		{Name: "Dagger Slash", DamageMult: 1.0, Description: "slashes with a jagged dagger"},
-		{Name: "Quick Bite", DamageMult: 1.2, Description: "lunges forward for a nasty bite"},
-		{Name: "Throw Sand", DamageMult: 0.8, Description: "kicks dirty sand to distract"},
+		{Name: "Poisoned Blade", DamageMult: 1.3, Description: "stabs with a venom-tipped blade"},
+		{Name: "Frenzied Flurry", DamageMult: 1.5, Description: "strikes wildly with dual daggers"},
 	}
 	return &Monster{
 		Entity:   NewEntity("goblin", "Goblin Scout", 'g', tcell.ColorGreen, x, y, true),
-		HP:       14,
-		MaxHP:    14,
-		ATK:      5,
-		DEF:      1,
-		EXP:      20,
+		HP:       18,
+		MaxHP:    18,
+		ATK:      7,
+		DEF:      2,
+		EXP:      25,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -62,17 +62,17 @@ func NewSkeleton(x, y int) *Monster {
 		`   | |   `,
 	}
 	actions := []MonsterAction{
-		{Name: "Rusty Blade", DamageMult: 1.0, Description: "swings an ancient rusted blade"},
-		{Name: "Shield Slam", DamageMult: 1.3, Description: "bashes with a cracked iron shield"},
-		{Name: "Bone Rattle", DamageMult: 0.9, Description: "unleashes a chilling necrotic aura"},
+		{Name: "Rusty Blade", DamageMult: 1.1, Description: "swings an ancient rusted blade"},
+		{Name: "Shield Bash", DamageMult: 1.4, Description: "bashes hard with a spiked iron shield"},
+		{Name: "Cursed Cleave", DamageMult: 1.6, Description: "channels necrotic energy into a brutal strike"},
 	}
 	return &Monster{
 		Entity:   NewEntity("skeleton", "Skeletal Guard", 's', tcell.ColorWhite, x, y, true),
-		HP:       22,
-		MaxHP:    22,
-		ATK:      7,
-		DEF:      3,
-		EXP:      35,
+		HP:       30,
+		MaxHP:    30,
+		ATK:      10,
+		DEF:      4,
+		EXP:      45,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -87,17 +87,17 @@ func NewOrc(x, y int) *Monster {
 		`  /   \  `,
 	}
 	actions := []MonsterAction{
-		{Name: "Heavy Cleave", DamageMult: 1.2, Description: "swings a giant battleaxe"},
-		{Name: "War Stomp", DamageMult: 1.4, Description: "stomps the ground, crushing your armor"},
-		{Name: "Berserk Roar", DamageMult: 1.1, Description: "enters a bloodthirsty frenzy"},
+		{Name: "Heavy Cleave", DamageMult: 1.3, Description: "swings a giant battleaxe with crushing power"},
+		{Name: "Skull Crusher", DamageMult: 1.7, Description: "leaps into the air and smashes your helm"},
+		{Name: "Bloodrage Frenzy", DamageMult: 2.0, Description: "unleashes a devastating berserker combo"},
 	}
 	return &Monster{
 		Entity:   NewEntity("orc", "Orc Berserker", 'o', tcell.ColorOlive, x, y, true),
-		HP:       34,
-		MaxHP:    34,
-		ATK:      10,
-		DEF:      4,
-		EXP:      55,
+		HP:       48,
+		MaxHP:    48,
+		ATK:      15,
+		DEF:      5,
+		EXP:      75,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -113,17 +113,17 @@ func NewDarkWizard(x, y int) *Monster {
 		`   / \   `,
 	}
 	actions := []MonsterAction{
-		{Name: "Shadow Bolt", DamageMult: 1.3, IsMagic: true, Description: "casts a bolt of dark magic"},
-		{Name: "Life Siphon", DamageMult: 1.0, IsMagic: true, Description: "drains vitality from your soul"},
-		{Name: "Flame Hex", DamageMult: 1.5, IsMagic: true, Description: "ignites the air with cursed fire"},
+		{Name: "Shadow Bolt", DamageMult: 1.4, IsMagic: true, Description: "casts a piercing bolt of dark void magic"},
+		{Name: "Life Siphon", DamageMult: 1.2, IsMagic: true, Description: "drains vitality directly from your soul"},
+		{Name: "Hellfire Hex", DamageMult: 1.8, IsMagic: true, Description: "erupts the ground in cursed black flames"},
 	}
 	return &Monster{
 		Entity:   NewEntity("dark_wizard", "Dark Sorcerer", 'w', tcell.ColorPurple, x, y, true),
-		HP:       30,
-		MaxHP:    30,
-		ATK:      13,
-		DEF:      2,
-		EXP:      80,
+		HP:       42,
+		MaxHP:    42,
+		ATK:      18,
+		DEF:      3,
+		EXP:      100,
 		IsBoss:   false,
 		Alerted:  false,
 		Sprite:   sprite,
@@ -139,17 +139,17 @@ func NewMimic(x, y int) *Monster {
 		`  /^^^^^^\  `,
 	}
 	actions := []MonsterAction{
-		{Name: "Chest Chomp", DamageMult: 1.4, Description: "snaps its razor-toothed jaws"},
-		{Name: "Tongue Lash", DamageMult: 1.1, Description: "whips with an adhesive sticky tongue"},
-		{Name: "Gold Spray", DamageMult: 1.2, Description: "vomits cursed heavy coins"},
+		{Name: "Chest Chomp", DamageMult: 1.5, Description: "snaps its razor-toothed wooden jaws"},
+		{Name: "Adhesive Lash", DamageMult: 1.3, Description: "whips with an adhesive sticky tongue"},
+		{Name: "Gold Shrapnel", DamageMult: 1.6, Description: "blasts jagged heavy metal coins at point-blank"},
 	}
 	return &Monster{
 		Entity:   NewEntity("mimic", "Hungry Mimic", 'M', tcell.ColorGold, x, y, true),
-		HP:       32,
-		MaxHP:    32,
-		ATK:      12,
-		DEF:      4,
-		EXP:      75,
+		HP:       45,
+		MaxHP:    45,
+		ATK:      16,
+		DEF:      5,
+		EXP:      90,
 		IsBoss:   false,
 		Alerted:  true,
 		Sprite:   sprite,
@@ -167,18 +167,18 @@ func NewDragonBoss(x, y int) *Monster {
 		`    /    \    `,
 	}
 	actions := []MonsterAction{
-		{Name: "Inferno Breath", DamageMult: 1.6, IsMagic: true, Description: "breathes a catastrophic cone of dragon fire"},
-		{Name: "Tail Sweep", DamageMult: 1.3, Description: "whips its colossal spiked tail"},
-		{Name: "Dragon Claws", DamageMult: 1.2, Description: "rakes with razor-sharp fiery claws"},
-		{Name: "Roar of Ruin", DamageMult: 1.1, Description: "shakes the entire dungeon chamber"},
+		{Name: "Inferno Breath", DamageMult: 1.8, IsMagic: true, Description: "breathes a catastrophic cone of dragon fire"},
+		{Name: "Tail Slam", DamageMult: 1.5, Description: "whips its colossal spiked tail against you"},
+		{Name: "Dragon Claws", DamageMult: 1.4, Description: "rakes with razor-sharp fiery claws"},
+		{Name: "Cataclysm Roar", DamageMult: 2.0, Description: "unleashes a roar of pure annihilation"},
 	}
 	return &Monster{
 		Entity:   NewEntity("dragon_boss", "Ancient Red Dragon", 'D', tcell.ColorRed, x, y, true),
-		HP:       120,
-		MaxHP:    120,
-		ATK:      18,
-		DEF:      7,
-		EXP:      400,
+		HP:       180,
+		MaxHP:    180,
+		ATK:      24,
+		DEF:      9,
+		EXP:      500,
 		IsBoss:   true,
 		Alerted:  true,
 		Sprite:   sprite,
@@ -186,23 +186,23 @@ func NewDragonBoss(x, y int) *Monster {
 	}
 }
 
-// GenerateRandomMonster spawns monsters scaled to dungeon floor with 20% Champion chance
+// GenerateRandomMonster spawns monsters scaled to dungeon floor with 25% Champion chance
 func GenerateRandomMonster(x, y, floor int, rng *rand.Rand) *Monster {
 	var m *Monster
 	roll := rng.Intn(100)
 
 	switch {
 	case floor >= 4:
-		if roll < 35 {
+		if roll < 40 {
 			m = NewDarkWizard(x, y)
-		} else if roll < 70 {
+		} else if roll < 75 {
 			m = NewOrc(x, y)
 		} else {
 			m = NewSkeleton(x, y)
 		}
 
 	case floor >= 3:
-		if roll < 45 {
+		if roll < 50 {
 			m = NewOrc(x, y)
 		} else if roll < 80 {
 			m = NewSkeleton(x, y)
@@ -211,43 +211,43 @@ func GenerateRandomMonster(x, y, floor int, rng *rand.Rand) *Monster {
 		}
 
 	case floor >= 2:
-		if roll < 50 {
+		if roll < 55 {
 			m = NewSkeleton(x, y)
 		} else {
 			m = NewGoblin(x, y)
 		}
 
 	default:
-		if roll < 20 {
+		if roll < 25 {
 			m = NewSkeleton(x, y)
 		} else {
 			m = NewGoblin(x, y)
 		}
 	}
 
-	// 20% Chance for Monster to be an Elite Champion
-	if rng.Intn(100) < 20 {
+	// 25% Chance for Monster to be an Elite Champion
+	if rng.Intn(100) < 25 {
 		m.IsChampion = true
 		affixes := []string{"[Fiery]", "[Vampiric]", "[Armored]", "[Frenzied]"}
 		m.Affix = affixes[rng.Intn(len(affixes))]
 		m.Name = fmt.Sprintf("%s %s", m.Affix, m.Name)
-		m.MaxHP = int(float64(m.MaxHP) * 1.4)
+		m.MaxHP = int(float64(m.MaxHP) * 1.5)
 		m.HP = m.MaxHP
-		m.EXP = int(float64(m.EXP) * 1.8)
+		m.EXP = int(float64(m.EXP) * 2.0)
 
 		switch m.Affix {
 		case "[Fiery]":
 			m.Color = tcell.ColorOrangeRed
-			m.ATK += 3
+			m.ATK += 4
 		case "[Vampiric]":
 			m.Color = tcell.ColorCrimson
-			m.ATK += 2
+			m.ATK += 3
 		case "[Armored]":
 			m.Color = tcell.ColorSilver
-			m.DEF += 4
+			m.DEF += 5
 		case "[Frenzied]":
 			m.Color = tcell.ColorMediumPurple
-			m.ATK += 4
+			m.ATK += 5
 		}
 	}
 

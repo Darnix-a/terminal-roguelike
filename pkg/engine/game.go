@@ -623,6 +623,8 @@ func (g *Game) DescendStairs() {
 
 	if g.Floor == 0 {
 		g.Log.Add("Training Complete! Descending into Dungeon Floor 1...", tcell.ColorGold)
+		g.Log.Add("Tutorial items cleared. Entering the dungeon with starter loadout!", tcell.ColorYellow)
+		g.Player = nil // Creates clean fresh player for Floor 1
 	} else {
 		g.Log.Add(fmt.Sprintf("You descend the stairs into Floor %d...", nextFloor), tcell.ColorGold)
 	}

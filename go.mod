@@ -1,6 +1,6 @@
 module terminal-roguelike
 
-go 1.22
+go 1.24.0
 
 require github.com/gdamore/tcell/v2 v2.13.10
 

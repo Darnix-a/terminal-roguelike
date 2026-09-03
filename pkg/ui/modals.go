@@ -50,7 +50,7 @@ func RenderInventoryModal(screen tcell.Screen, g *engine.Game) {
 		}
 	}
 
-	DrawText(screen, x1+3, y2-2, tcell.StyleDefault.Foreground(tcell.ColorYellow), "Press [a-z] to Use/Equip | [d]+[a-z] Drop | [Esc/i] Close")
+	DrawText(screen, x1+3, y2-2, tcell.StyleDefault.Foreground(tcell.ColorYellow), "Press [a-z] Use/Equip | [Shift+D] Drop Mode | [Esc/i] Close")
 }
 
 // RenderGameOverModal renders the death screen

@@ -124,7 +124,7 @@ func main() {
 					continue
 				}
 
-				if ev.Rune() == 'd' && !dropMode {
+				if (ev.Rune() == 'D' || ev.Rune() == 'X' || ev.Key() == tcell.KeyDelete) && !dropMode {
 					dropMode = true
 					game.Log.Add("Drop mode: Press [a-z] to choose item to drop.", tcell.ColorOrangeRed)
 					continue
