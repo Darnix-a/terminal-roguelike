@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/gdamore/tcell/v2"
@@ -15,56 +14,123 @@ import (
 func main() {
 	screen, err := tcell.NewScreen()
 	if err != nil {
-		log.Fatalf("Failed to initialize terminal screen: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error creating tcell screen: %v\n", err)
+		os.Exit(1)
 	}
 
 	if err := screen.Init(); err != nil {
-		log.Fatalf("Screen init error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error initializing tcell screen: %v\n", err)
+		os.Exit(1)
 	}
 	defer screen.Fini()
 
-	screen.SetStyle(tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset))
+	screen.SetStyle(tcell.StyleDefault.Background(tcell.ColorBlack).Foreground(tcell.ColorWhite))
 	screen.Clear()
 
 	sw, sh := screen.Size()
-	sidebarW := 32
-	if sw < 85 {
-		sidebarW = 28
+	mapW := sw - 33
+	mapH := sh - 9
+	if mapW < 40 {
+		mapW = 40
 	}
-	logH := 6
-	if sh < 26 {
-		logH = 5
+	if mapH < 15 {
+		mapH = 15
 	}
-	mapW := sw - sidebarW - 2
-	mapH := sh - logH - 3
 
 	game := engine.NewGame(mapW, mapH)
+	game.State = engine.StateMainMenu
+
 	dropMode := false
 
-	// Main Game Loop
 	for {
-		ui.Render(screen, game)
+		// Render current state
+		switch game.State {
+		case engine.StateMainMenu:
+			ui.RenderMainMenu(screen, engine.HasActiveSave())
 
+		case engine.StateHighScores:
+			ui.RenderHighScoresScreen(screen, engine.GetHighScores())
+
+		case engine.StateHelp:
+			ui.RenderHelpScreen(screen)
+
+		case engine.StateCombat:
+			if game.ActiveBattle != nil {
+				ui.RenderBattleScreen(screen, game.ActiveBattle)
+			} else {
+				game.State = engine.StatePlaying
+				ui.Render(screen, game)
+			}
+
+		default:
+			ui.Render(screen, game)
+		}
+
+		// Event polling
 		ev := screen.PollEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
 			screen.Sync()
+			sw, sh = screen.Size()
+			mapW = sw - 33
+			mapH = sh - 9
+			if mapW < 40 {
+				mapW = 40
+			}
+			if mapH < 15 {
+				mapH = 15
+			}
+			game.MapW = mapW
+			game.MapH = mapH
 
 		case *tcell.EventKey:
-			// Global Quit
-			if ev.Key() == tcell.KeyCtrlC {
-				return
-			}
-
-			// Handle Input by State
 			switch game.State {
-			case engine.StateGameOver, engine.StateVictory:
-				if ev.Rune() == 'r' || ev.Rune() == 'R' {
-					game = engine.NewGame(mapW, mapH)
-				} else if ev.Rune() == 'q' || ev.Rune() == 'Q' || ev.Key() == tcell.KeyEscape {
+
+			// 1. MAIN MENU
+			case engine.StateMainMenu:
+				switch ev.Key() {
+				case tcell.KeyEscape:
 					return
+				default:
+					switch ev.Rune() {
+					case '1': // New Game
+						game = engine.NewGameCustom(1, mapW, mapH)
+						game.State = engine.StatePlaying
+
+					case '2': // Continue Game
+						if engine.HasActiveSave() {
+							game = engine.LoadGameFromSave(mapW, mapH)
+							game.State = engine.StatePlaying
+						}
+
+					case '3': // Replay Tutorial
+						game = engine.NewGameCustom(0, mapW, mapH)
+						game.State = engine.StatePlaying
+
+					case '4': // High Scores
+						game.State = engine.StateHighScores
+
+					case '5', '?': // Help
+						game.State = engine.StateHelp
+
+					case 'q', 'Q':
+						return
+					}
 				}
 
+			// 2. HIGH SCORES
+			case engine.StateHighScores:
+				if ev.Key() == tcell.KeyEscape || ev.Key() == tcell.KeyEnter || ev.Rune() == 'q' || ev.Rune() == 'Q' || ev.Rune() == ' ' {
+					game.State = engine.StateMainMenu
+				}
+
+			// 3. HELP SCREEN
+			case engine.StateHelp:
+				if ev.Key() == tcell.KeyEscape || ev.Key() == tcell.KeyEnter || ev.Rune() == 'q' || ev.Rune() == 'Q' || ev.Rune() == ' ' {
+					game.State = engine.StateMainMenu
+				}
+
+			// 4. COMBAT ARENA
 			case engine.StateCombat:
 				battle := game.ActiveBattle
 				if battle == nil {
@@ -72,15 +138,11 @@ func main() {
 					continue
 				}
 
-				// If battle finished, any key returns to map or game over
 				if battle.Result != combat.BattleOngoing {
-					if ev.Key() == tcell.KeyEnter || ev.Key() == tcell.KeyEscape || ev.Rune() == ' ' || ev.Rune() == 'q' {
-						game.ConcludeBattle()
-					}
+					game.ConcludeBattle()
 					continue
 				}
 
-				// Active Battle Menu Navigation
 				switch battle.SubMenu {
 				case combat.MenuMain:
 					switch ev.Rune() {
@@ -89,8 +151,10 @@ func main() {
 					case '2':
 						battle.SubMenu = combat.MenuSkills
 					case '3':
-						battle.SubMenu = combat.MenuItems
+						battle.PlayerUseSkill(2) // Shield Guard shortcut
 					case '4':
+						battle.SubMenu = combat.MenuItems
+					case '5':
 						battle.PlayerFlee()
 					}
 
@@ -117,6 +181,7 @@ func main() {
 					}
 				}
 
+			// 5. INVENTORY MODAL
 			case engine.StateInventory:
 				if ev.Key() == tcell.KeyEscape || ev.Rune() == 'i' || ev.Rune() == 'q' {
 					game.State = engine.StatePlaying
@@ -142,6 +207,8 @@ func main() {
 					}
 					game.State = engine.StatePlaying
 				}
+
+			// 6. DUNGEON SHOP
 			case engine.StateShop:
 				if ev.Key() == tcell.KeyEscape || ev.Rune() == 'q' || ev.Rune() == 'Q' {
 					game.State = engine.StatePlaying
@@ -159,6 +226,7 @@ func main() {
 					game.BuyShopItem(slotIdx)
 				}
 
+			// 7. PLAYING (DUNGEON EXPLORATION)
 			case engine.StatePlaying:
 				switch ev.Key() {
 				case tcell.KeyUp:
@@ -170,54 +238,50 @@ func main() {
 				case tcell.KeyRight:
 					game.HandlePlayerAction(1, 0)
 				case tcell.KeyEscape:
-					return
+					engine.SaveGameProgress(game)
+					game.State = engine.StateMainMenu
 
 				default:
 					switch ev.Rune() {
-					// Movement: WASD & Vi-keys
-					case 'w', 'W', 'k', 'K':
+					case 'w', 'k':
 						game.HandlePlayerAction(0, -1)
-					case 's', 'S', 'j', 'J':
+					case 's', 'j':
 						game.HandlePlayerAction(0, 1)
-					case 'a', 'A', 'h', 'H':
+					case 'a', 'h':
 						game.HandlePlayerAction(-1, 0)
-					case 'd', 'D', 'l', 'L':
+					case 'd', 'l':
 						game.HandlePlayerAction(1, 0)
-
-					// Diagonal Movement (Vi-keys)
-					case 'y', 'Y':
-						game.HandlePlayerAction(-1, -1)
-					case 'u', 'U':
-						game.HandlePlayerAction(1, -1)
-					case 'b', 'B':
-						game.HandlePlayerAction(-1, 1)
-					case 'n', 'N':
-						game.HandlePlayerAction(1, 1)
-
-					// Actions
 					case 'g', ',':
 						game.PickUpItem()
-
-					case 'i', 'I':
+					case 'i':
 						game.State = engine.StateInventory
-
+						dropMode = false
 					case '>', '.':
-						if ev.Rune() == '>' {
-							game.DescendStairs()
-						} else {
-							game.Log.Add("You wait a turn...", tcell.ColorDarkGray)
-							game.EndPlayerTurn()
-						}
-
+						game.DescendStairs()
 					case ' ':
-						game.Log.Add("You wait a turn...", tcell.ColorDarkGray)
-						game.EndPlayerTurn()
-
+						game.EndPlayerTurn() // Wait 1 turn
+					case 'S':
+						engine.SaveGameProgress(game)
+						game.State = engine.StateMainMenu
 					case 'q', 'Q':
-						screen.Fini()
-						fmt.Println("Thanks for playing!")
-						os.Exit(0)
+						engine.SaveGameProgress(game)
+						game.State = engine.StateMainMenu
 					}
+				}
+
+			// 8. GAME OVER & VICTORY
+			case engine.StateGameOver, engine.StateVictory:
+				switch ev.Rune() {
+				case 'r', 'R':
+					game = engine.NewGameCustom(1, mapW, mapH)
+					game.State = engine.StatePlaying
+				case 'm', 'M':
+					game.State = engine.StateMainMenu
+				case 'q', 'Q':
+					game.State = engine.StateMainMenu
+				}
+				if ev.Key() == tcell.KeyEscape || ev.Key() == tcell.KeyEnter {
+					game.State = engine.StateMainMenu
 				}
 			}
 		}

@@ -16,10 +16,13 @@ import (
 type GameState int
 
 const (
-	StatePlaying GameState = iota
+	StateMainMenu GameState = iota
+	StatePlaying
 	StateInventory
 	StateShop
 	StateCombat
+	StateHighScores
+	StateHelp
 	StateGameOver
 	StateVictory
 )
@@ -47,6 +50,14 @@ type Game struct {
 }
 
 func NewGame(mapW, mapH int) *Game {
+	startFloor := 1
+	if !HasCompletedTutorial() {
+		startFloor = 0
+	}
+	return NewGameCustom(startFloor, mapW, mapH)
+}
+
+func NewGameCustom(floor int, mapW, mapH int) *Game {
 	if mapW < 50 {
 		mapW = 70
 	}
@@ -54,15 +65,10 @@ func NewGame(mapW, mapH int) *Game {
 		mapH = 22
 	}
 
-	startFloor := 0
-	if HasCompletedTutorial() {
-		startFloor = 1
-	}
-
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	g := &Game{
 		State:            StatePlaying,
-		Floor:            startFloor,
+		Floor:            floor,
 		MaxFloors:        5,
 		TurnCount:        0,
 		Log:              NewMessageLog(100),
@@ -74,7 +80,54 @@ func NewGame(mapW, mapH int) *Game {
 		TutorialTriggers: make(map[string]bool),
 	}
 
-	g.generateFloor(startFloor)
+	g.generateFloor(floor)
+	return g
+}
+
+func LoadGameFromSave(mapW, mapH int) *Game {
+	app := loadAppData()
+	if app.ActiveSave == nil {
+		return NewGame(mapW, mapH)
+	}
+
+	save := app.ActiveSave
+	g := NewGameCustom(save.Floor, mapW, mapH)
+	g.TurnCount = save.TurnCount
+
+	// Restore Player Stats
+	g.Player.HP = save.Player.HP
+	g.Player.MaxHP = save.Player.MaxHP
+	g.Player.MP = save.Player.MP
+	g.Player.MaxMP = save.Player.MaxMP
+	g.Player.BaseATK = save.Player.BaseATK
+	g.Player.BaseDEF = save.Player.BaseDEF
+	g.Player.Level = save.Player.Level
+	g.Player.EXP = save.Player.EXP
+	g.Player.MaxEXP = save.Player.MaxEXP
+	g.Player.Gold = save.Player.Gold
+	g.Player.Keys = save.Player.Keys
+	g.Player.Kills = save.Player.Kills
+
+	// Restore Inventory
+	g.Player.Inventory.Items = make([]*items.Item, 0)
+	for _, itm := range save.Player.Inventory {
+		restoredItem := &items.Item{
+			ID:          itm.ID,
+			Name:        itm.Name,
+			Type:        itm.Type,
+			Rune:        itm.Rune,
+			HealAmount:  itm.HealAmount,
+			BonusATK:    itm.BonusATK,
+			BonusDEF:    itm.BonusDEF,
+			Value:       itm.Value,
+			Description: itm.Description,
+			Equipped:    itm.Equipped,
+		}
+		_ = g.Player.Inventory.Add(restoredItem)
+	}
+
+	g.Log.Add("=== CONTINUED SAVED GAME ===", tcell.ColorGold)
+	g.Log.Add(fmt.Sprintf("Welcome back, Lv.%d Hero! Resumed at Dungeon Floor %d.", g.Player.Level, g.Floor), tcell.ColorYellow)
 	return g
 }
 
@@ -246,6 +299,9 @@ func (g *Game) generateFloor(floor int) {
 				}
 			}
 		}
+
+		// Auto-save on floor generation
+		SaveGameProgress(g)
 	}
 
 	g.Map.ComputeFOV(g.Player.X, g.Player.Y, g.FOVRadius)
@@ -332,13 +388,40 @@ func (g *Game) ConcludeBattle() {
 		if monster.IsBoss {
 			g.Log.Add("THE ANCIENT RED DRAGON HAS FALLEN! VICTORY IS YOURS!", tcell.ColorGold)
 			g.State = StateVictory
+			DeleteActiveSave()
+
+			score := g.Player.Gold + (g.Player.Kills * 50) + 1000 + (g.Player.Level * 100)
+			RecordHighScore(HighScoreEntry{
+				Score:     score,
+				Floor:     g.Floor,
+				Level:     g.Player.Level,
+				Kills:     g.Player.Kills,
+				Gold:      g.Player.Gold,
+				Outcome:   "Conquered Dungeon (Victory)",
+				Timestamp: time.Now(),
+			})
 			return
 		}
 
 		g.State = StatePlaying
+		if g.Floor > 0 {
+			SaveGameProgress(g)
+		}
 
 	case combat.BattleDefeat:
 		g.State = StateGameOver
+		DeleteActiveSave()
+
+		score := g.Player.Gold + (g.Player.Kills * 25) + (g.Floor * 100) + (g.Player.Level * 50)
+		RecordHighScore(HighScoreEntry{
+			Score:     score,
+			Floor:     g.Floor,
+			Level:     g.Player.Level,
+			Kills:     g.Player.Kills,
+			Gold:      g.Player.Gold,
+			Outcome:   fmt.Sprintf("Slain by %s on Floor %d", g.ActiveBattle.Monster.Name, g.Floor),
+			Timestamp: time.Now(),
+		})
 
 	case combat.BattleFled:
 		g.Log.Add("Escaped from combat back into the dungeon shadows.", tcell.ColorYellow)
@@ -398,6 +481,7 @@ func (g *Game) BuyShopItem(slot int) {
 			g.Log.Add("Not enough gold to buy Scroll of Teleportation!", tcell.ColorRed)
 		}
 	}
+	SaveGameProgress(g)
 }
 
 // AttackMerchant provokes the shopkeeper into combat
