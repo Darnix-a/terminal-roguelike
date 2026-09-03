@@ -48,12 +48,23 @@ func (inv *Inventory) Equip(item *Item) string {
 		if inv.EquippedWeapon != nil {
 			inv.EquippedWeapon.Equipped = false
 		}
+		// Clear any orphaned equipped flags
+		for _, itm := range inv.Items {
+			if itm.Type == TypeWeapon {
+				itm.Equipped = false
+			}
+		}
 		inv.EquippedWeapon = item
 		item.Equipped = true
 		return fmt.Sprintf("Equipped %s (+%d ATK)", item.Name, item.BonusATK)
 	} else if item.Type == TypeArmor {
 		if inv.EquippedArmor != nil {
 			inv.EquippedArmor.Equipped = false
+		}
+		for _, itm := range inv.Items {
+			if itm.Type == TypeArmor {
+				itm.Equipped = false
+			}
 		}
 		inv.EquippedArmor = item
 		item.Equipped = true
@@ -63,12 +74,12 @@ func (inv *Inventory) Equip(item *Item) string {
 }
 
 func (inv *Inventory) Unequip(item *Item) string {
-	if item == inv.EquippedWeapon {
+	if item.Type == TypeWeapon && (item == inv.EquippedWeapon || item.Equipped) {
 		inv.EquippedWeapon = nil
 		item.Equipped = false
 		return fmt.Sprintf("Unequipped %s", item.Name)
 	}
-	if item == inv.EquippedArmor {
+	if item.Type == TypeArmor && (item == inv.EquippedArmor || item.Equipped) {
 		inv.EquippedArmor = nil
 		item.Equipped = false
 		return fmt.Sprintf("Unequipped %s", item.Name)
@@ -102,19 +113,23 @@ func GenerateRandomItem(x, y, floor int, rng *rand.Rand) *Item {
 
 	// Potion Drop
 	if roll < 65 {
-		if floor >= 3 && rng.Intn(2) == 1 {
+		if floor >= 3 && rng.Intn(2) == 0 {
 			return NewGreaterHealthPotion(x, y)
 		}
 		return NewHealthPotion(x, y)
 	}
 
 	// Scroll Drop
-	if roll < 75 {
+	if roll < 80 {
+		if rng.Intn(3) == 0 {
+			return NewScrollEnchantment(x, y)
+		}
 		return NewScrollTeleport(x, y)
 	}
 
-	// Weapon Drop
-	if roll < 90 {
+	// Weapon or Armor Drop
+	if rng.Intn(2) == 0 {
+		// Weapon
 		switch {
 		case floor >= 4:
 			return NewFlamingSword(x, y)
@@ -125,15 +140,15 @@ func GenerateRandomItem(x, y, floor int, rng *rand.Rand) *Item {
 		default:
 			return NewDagger(x, y)
 		}
-	}
-
-	// Armor Drop
-	switch {
-	case floor >= 4:
-		return NewPlateArmor(x, y)
-	case floor >= 2:
-		return NewChainmail(x, y)
-	default:
-		return NewLeatherArmor(x, y)
+	} else {
+		// Armor
+		switch {
+		case floor >= 4:
+			return NewPlateArmor(x, y)
+		case floor >= 3:
+			return NewChainmail(x, y)
+		default:
+			return NewLeatherArmor(x, y)
+		}
 	}
 }

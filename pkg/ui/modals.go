@@ -9,10 +9,10 @@ import (
 	"terminal-roguelike/pkg/items"
 )
 
-// RenderInventoryModal renders the item selection inventory window
+// RenderInventoryModal renders the interactive keyboard/arrow navigation inventory
 func RenderInventoryModal(screen tcell.Screen, g *engine.Game) {
 	sw, sh := screen.Size()
-	w, h := 52, 20
+	w, h := 58, 18
 	x1 := (sw - w) / 2
 	y1 := (sh - h) / 2
 	x2 := x1 + w
@@ -25,32 +25,50 @@ func RenderInventoryModal(screen tcell.Screen, g *engine.Game) {
 		}
 	}
 
-	DrawBox(screen, x1, y1, x2, y2, tcell.StyleDefault.Foreground(tcell.ColorGold).Bold(true), "Inventory")
+	DrawBox(screen, x1, y1, x2, y2, tcell.StyleDefault.Foreground(tcell.ColorGold).Bold(true), "INVENTORY")
 
 	inv := g.Player.Inventory
 	if len(inv.Items) == 0 {
 		DrawText(screen, x1+4, y1+4, tcell.StyleDefault.Foreground(tcell.ColorDarkGray), "Your backpack is empty.")
 	} else {
+		if g.InventoryIdx < 0 {
+			g.InventoryIdx = 0
+		}
+		if g.InventoryIdx >= len(inv.Items) {
+			g.InventoryIdx = len(inv.Items) - 1
+		}
+
 		for i, itm := range inv.Items {
-			letter := rune('a' + i)
+			isSelected := (i == g.InventoryIdx)
 			style := tcell.StyleDefault.Foreground(tcell.ColorWhite)
 
 			status := ""
 			if itm.Equipped {
-				status = " (Equipped)"
-				style = style.Foreground(tcell.ColorGreen).Bold(true)
-			} else if itm.Type == items.TypePotion {
-				style = style.Foreground(tcell.ColorLightCoral)
-			} else if itm.Type == items.TypeScroll {
-				style = style.Foreground(tcell.ColorViolet)
+				status = " [EQUIPPED]"
 			}
 
-			line := fmt.Sprintf("[%c] %s - %s%s", letter, itm.Name, itm.Description, status)
-			DrawText(screen, x1+3, y1+2+i, style, line)
+			prefix := "  "
+			if isSelected {
+				prefix = "> "
+				style = tcell.StyleDefault.Foreground(tcell.ColorYellow).Background(tcell.ColorNavy).Bold(true)
+			} else if itm.Equipped {
+				style = tcell.StyleDefault.Foreground(tcell.ColorGreen).Bold(true)
+			} else if itm.Type == items.TypePotion {
+				style = tcell.StyleDefault.Foreground(tcell.ColorLightCoral)
+			} else if itm.Type == items.TypeScroll {
+				style = tcell.StyleDefault.Foreground(tcell.ColorViolet)
+			}
+
+			line := fmt.Sprintf("%s%s - %s%s", prefix, itm.Name, itm.Description, status)
+			if isSelected && len(line) < w-4 {
+				line += fmt.Sprintf("%*s", w-4-len(line), "")
+			}
+			DrawText(screen, x1+2, y1+2+i, style, line)
 		}
 	}
 
-	DrawText(screen, x1+3, y2-2, tcell.StyleDefault.Foreground(tcell.ColorYellow), "Press [a-z] Use/Equip | [Shift+D] Drop Mode | [Esc/i] Close")
+	footer := "▲/▼ Move | [Enter] Use/Equip | [d/x] Drop | [Esc/i] Close"
+	DrawText(screen, (sw-len(footer))/2, y2-2, tcell.StyleDefault.Foreground(tcell.ColorYellow), footer)
 }
 
 // RenderGameOverModal renders the death screen

@@ -124,6 +124,9 @@ func LoadGameFromSave(mapW, mapH int) *Game {
 			Equipped:    itm.Equipped,
 		}
 		_ = g.Player.Inventory.Add(restoredItem)
+		if itm.Equipped {
+			g.Player.Inventory.Equip(restoredItem)
+		}
 	}
 
 	g.Log.Add("=== CONTINUED SAVED GAME ===", tcell.ColorGold)

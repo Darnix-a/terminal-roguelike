@@ -40,8 +40,6 @@ func main() {
 	game := engine.NewGame(mapW, mapH)
 	game.State = engine.StateMainMenu
 
-	dropMode := false
-
 	for {
 		// Render current state
 		switch game.State {
@@ -181,31 +179,55 @@ func main() {
 					}
 				}
 
-			// 5. INVENTORY MODAL
+			// 5. INVENTORY MODAL (Arrow Key / WASD navigation)
 			case engine.StateInventory:
-				if ev.Key() == tcell.KeyEscape || ev.Rune() == 'i' || ev.Rune() == 'q' {
-					game.State = engine.StatePlaying
-					dropMode = false
-					continue
-				}
+				invCount := len(game.Player.Inventory.Items)
 
-				if (ev.Rune() == 'D' || ev.Rune() == 'X' || ev.Key() == tcell.KeyDelete) && !dropMode {
-					dropMode = true
-					game.Log.Add("Drop mode: Press [a-z] to choose item to drop.", tcell.ColorOrangeRed)
-					continue
-				}
-
-				// Select slot a-z
-				r := ev.Rune()
-				if r >= 'a' && r <= 'z' {
-					slotIdx := int(r - 'a')
-					if dropMode {
-						game.DropInventoryItem(slotIdx)
-						dropMode = false
-					} else {
-						game.UseInventoryItem(slotIdx)
+				switch ev.Key() {
+				case tcell.KeyUp:
+					if game.InventoryIdx > 0 {
+						game.InventoryIdx--
 					}
+				case tcell.KeyDown:
+					if game.InventoryIdx < invCount-1 {
+						game.InventoryIdx++
+					}
+				case tcell.KeyEnter:
+					if invCount > 0 {
+						game.UseInventoryItem(game.InventoryIdx)
+						game.State = engine.StatePlaying
+					}
+				case tcell.KeyDelete, tcell.KeyBackspace, tcell.KeyBackspace2:
+					if invCount > 0 {
+						game.DropInventoryItem(game.InventoryIdx)
+						game.State = engine.StatePlaying
+					}
+				case tcell.KeyEscape:
 					game.State = engine.StatePlaying
+
+				default:
+					switch ev.Rune() {
+					case 'w', 'k', 'W', 'K':
+						if game.InventoryIdx > 0 {
+							game.InventoryIdx--
+						}
+					case 's', 'j', 'S', 'J':
+						if game.InventoryIdx < invCount-1 {
+							game.InventoryIdx++
+						}
+					case ' ', 'e', 'E':
+						if invCount > 0 {
+							game.UseInventoryItem(game.InventoryIdx)
+							game.State = engine.StatePlaying
+						}
+					case 'd', 'D', 'x', 'X':
+						if invCount > 0 {
+							game.DropInventoryItem(game.InventoryIdx)
+							game.State = engine.StatePlaying
+						}
+					case 'i', 'I', 'q', 'Q':
+						game.State = engine.StatePlaying
+					}
 				}
 
 			// 6. DUNGEON SHOP
@@ -255,7 +277,6 @@ func main() {
 						game.PickUpItem()
 					case 'i':
 						game.State = engine.StateInventory
-						dropMode = false
 					case '>', '.':
 						game.DescendStairs()
 					case ' ':

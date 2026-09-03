@@ -39,12 +39,12 @@ func NewPlayer(x, y int) *Player {
 
 	// Starter Equipment
 	starterWeapon := items.NewDagger(0, 0)
-	starterWeapon.Equipped = true
 	_ = inv.Add(starterWeapon)
+	inv.Equip(starterWeapon)
 
 	starterArmor := items.NewLeatherArmor(0, 0)
-	starterArmor.Equipped = true
 	_ = inv.Add(starterArmor)
+	inv.Equip(starterArmor)
 
 	// 2 Starter Potions
 	pot1 := items.NewHealthPotion(0, 0)
