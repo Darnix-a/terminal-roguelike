@@ -222,25 +222,36 @@ func Render(screen tcell.Screen, g *engine.Game) {
 	}
 	mpFilled := int(mpPct * float64(barLen))
 	mpBarStr := fmt.Sprintf("[%s%s]", strings.Repeat("*", mpFilled), strings.Repeat(" ", barLen-mpFilled))
-	DrawText(screen, sideX+2, 3, tcell.StyleDefault.Foreground(tcell.ColorAqua), fmt.Sprintf("MP: %d/%d %s", g.Player.MP, g.Player.MaxMP, mpBarStr))
+	DrawText(screen, sideX+2, 3, tcell.StyleDefault.Foreground(tcell.ColorAqua), fmt.Sprintf("MP:  %d/%d %s", g.Player.MP, g.Player.MaxMP, mpBarStr))
+
+	// EXP Bar
+	expPct := float64(g.Player.EXP) / float64(g.Player.MaxEXP)
+	if expPct < 0 {
+		expPct = 0
+	} else if expPct > 1.0 {
+		expPct = 1.0
+	}
+	expFilled := int(expPct * float64(barLen))
+	expBarStr := fmt.Sprintf("[%s%s]", strings.Repeat("+", expFilled), strings.Repeat(" ", barLen-expFilled))
+	DrawText(screen, sideX+2, 4, tcell.StyleDefault.Foreground(tcell.ColorGold), fmt.Sprintf("EXP: %d/%d %s", g.Player.EXP, g.Player.MaxEXP, expBarStr))
 
 	// Combat Stats
-	DrawText(screen, sideX+2, 5, tcell.StyleDefault.Foreground(tcell.ColorLightSalmon), fmt.Sprintf("ATK: %d (%d+%d)", g.Player.TotalATK(), g.Player.BaseATK, g.Player.Inventory.TotalBonusATK()))
-	DrawText(screen, sideX+2, 6, tcell.StyleDefault.Foreground(tcell.ColorSkyblue), fmt.Sprintf("DEF: %d (%d+%d)", g.Player.TotalDEF(), g.Player.BaseDEF, g.Player.Inventory.TotalBonusDEF()))
-	DrawText(screen, sideX+2, 7, tcell.StyleDefault.Foreground(tcell.ColorGold), fmt.Sprintf("Gold: %d   Keys: %d", g.Player.Gold, g.Player.Keys))
+	DrawText(screen, sideX+2, 6, tcell.StyleDefault.Foreground(tcell.ColorLightSalmon), fmt.Sprintf("ATK: %d (%d+%d)", g.Player.TotalATK(), g.Player.BaseATK, g.Player.Inventory.TotalBonusATK()))
+	DrawText(screen, sideX+2, 7, tcell.StyleDefault.Foreground(tcell.ColorSkyblue), fmt.Sprintf("DEF: %d (%d+%d)", g.Player.TotalDEF(), g.Player.BaseDEF, g.Player.Inventory.TotalBonusDEF()))
+	DrawText(screen, sideX+2, 8, tcell.StyleDefault.Foreground(tcell.ColorGold), fmt.Sprintf("Gold: %d   Keys: %d", g.Player.Gold, g.Player.Keys))
 
 	// Equipment
 	weaponName := "(None)"
 	if g.Player.Inventory.EquippedWeapon != nil {
 		weaponName = g.Player.Inventory.EquippedWeapon.Name
 	}
-	DrawText(screen, sideX+2, 9, tcell.StyleDefault.Foreground(tcell.ColorLightCyan), fmt.Sprintf("Wpn: %s", weaponName))
+	DrawText(screen, sideX+2, 10, tcell.StyleDefault.Foreground(tcell.ColorLightCyan), fmt.Sprintf("Wpn: %s", weaponName))
 
 	armorName := "(None)"
 	if g.Player.Inventory.EquippedArmor != nil {
 		armorName = g.Player.Inventory.EquippedArmor.Name
 	}
-	DrawText(screen, sideX+2, 10, tcell.StyleDefault.Foreground(tcell.ColorSilver), fmt.Sprintf("Arm: %s", armorName))
+	DrawText(screen, sideX+2, 11, tcell.StyleDefault.Foreground(tcell.ColorSilver), fmt.Sprintf("Arm: %s", armorName))
 
 	// Controls
 	DrawText(screen, sideX+2, 12, tcell.StyleDefault.Foreground(tcell.ColorAqua).Bold(true), "--- CONTROLS ---")
