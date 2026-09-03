@@ -215,8 +215,9 @@ func (g *Game) generateFloor(floor int) {
 			vaultRoomIdx = candidateRooms[0]
 			candidateRooms = candidateRooms[1:]
 
-			// Seal true corridor doorways with Locked Doors '%'
-			for _, pt := range g.Map.Doorways[vaultRoomIdx] {
+			// Seal exactly 1 primary doorway with Locked Door '%'
+			if len(g.Map.Doorways[vaultRoomIdx]) > 0 {
+				pt := g.Map.Doorways[vaultRoomIdx][0]
 				g.Map.Tiles[pt.X][pt.Y] = mapgen.NewDoorLocked()
 			}
 
@@ -273,14 +274,17 @@ func (g *Game) generateFloor(floor int) {
 			g.ActiveMerchant = merchantMonster
 		}
 
-		// Add wooden doors to 30% of normal doorways
-		for rIdx := 0; rIdx < numRooms; rIdx++ {
-			if rIdx == vaultRoomIdx {
+		// Place at most 1-2 wooden doors across the entire dungeon (only on strict choke points)
+		doorsPlaced := 0
+		for rIdx := 0; rIdx < numRooms && doorsPlaced < 2; rIdx++ {
+			if rIdx == vaultRoomIdx || rIdx == shopRoomIdx {
 				continue
 			}
 			for _, pt := range g.Map.Doorways[rIdx] {
-				if g.RNG.Intn(100) < 30 && g.Map.Tiles[pt.X][pt.Y].Type == mapgen.TileFloor {
+				if doorsPlaced < 2 && g.RNG.Intn(100) < 25 && g.Map.IsValidChokePoint(pt.X, pt.Y) {
 					g.Map.Tiles[pt.X][pt.Y] = mapgen.NewDoorClosed()
+					doorsPlaced++
+					break
 				}
 			}
 		}

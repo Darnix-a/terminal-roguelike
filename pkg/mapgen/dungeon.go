@@ -122,6 +122,26 @@ func (m *DungeonMap) createVTunnel(y1, y2, x int) {
 	}
 }
 
+func (m *DungeonMap) IsValidChokePoint(x, y int) bool {
+	if !m.InBounds(x, y) || m.Tiles[x][y].Type != TileFloor {
+		return false
+	}
+
+	// Horizontal Choke: Solid wall above & below, open floor left & right
+	isHoriz := m.InBounds(x, y-1) && m.Tiles[x][y-1].Type == TileWall &&
+		m.InBounds(x, y+1) && m.Tiles[x][y+1].Type == TileWall &&
+		m.InBounds(x-1, y) && m.Tiles[x-1][y].Type == TileFloor &&
+		m.InBounds(x+1, y) && m.Tiles[x+1][y].Type == TileFloor
+
+	// Vertical Choke: Solid wall left & right, open floor above & below
+	isVert := m.InBounds(x-1, y) && m.Tiles[x-1][y].Type == TileWall &&
+		m.InBounds(x+1, y) && m.Tiles[x+1][y].Type == TileWall &&
+		m.InBounds(x, y-1) && m.Tiles[x][y-1].Type == TileFloor &&
+		m.InBounds(x, y+1) && m.Tiles[x][y+1].Type == TileFloor
+
+	return isHoriz || isVert
+}
+
 type Edge struct {
 	U int
 	V int
@@ -185,7 +205,6 @@ func Generate(width, height, maxRooms, minRoomSize, maxRoomSize int, rng *rand.R
 	numRooms := len(dungeon.Rooms)
 
 	// 2. Build Spanning Network of Corridors with Branching and Loops
-	// Calculate all pairwise distances
 	edges := make([]Edge, 0)
 	for i := 0; i < numRooms; i++ {
 		cx1, cy1 := dungeon.Rooms[i].Center()
@@ -200,7 +219,6 @@ func Generate(width, height, maxRooms, minRoomSize, maxRoomSize int, rng *rand.R
 		return edges[i].D < edges[j].D
 	})
 
-	// Disjoint set union (Kruskal's algorithm for minimum spanning tree)
 	parent := make([]int, numRooms)
 	for i := range parent {
 		parent[i] = i
@@ -225,20 +243,19 @@ func Generate(width, height, maxRooms, minRoomSize, maxRoomSize int, rng *rand.R
 
 	connectedEdges := make([]Edge, 0)
 
-	// Create Minimum Spanning Tree
+	// Minimum Spanning Tree
 	for _, edge := range edges {
 		if union(edge.U, edge.V) {
 			connectedEdges = append(connectedEdges, edge)
 		}
 	}
 
-	// Add 2-3 extra random edges for circular loops & alternate pathways
+	// Add 2 extra random edges for circular loops & alternate pathways
 	extraAdded := 0
 	for _, edge := range edges {
 		if extraAdded >= 2 {
 			break
 		}
-		// Pick short non-tree edges
 		isTreeEdge := false
 		for _, te := range connectedEdges {
 			if (te.U == edge.U && te.V == edge.V) || (te.U == edge.V && te.V == edge.U) {
@@ -252,7 +269,7 @@ func Generate(width, height, maxRooms, minRoomSize, maxRoomSize int, rng *rand.R
 		}
 	}
 
-	// Carve all connected corridors
+	// Carve corridors
 	for _, edge := range connectedEdges {
 		dungeon.RoomDegree[edge.U]++
 		dungeon.RoomDegree[edge.V]++
@@ -269,30 +286,24 @@ func Generate(width, height, maxRooms, minRoomSize, maxRoomSize int, rng *rand.R
 		}
 	}
 
-	// 3. Detect True Doorways (Corridor entry tiles into room perimeters)
+	// 3. Detect True 1-Tile Choke Point Doorways
 	for roomIdx, room := range dungeon.Rooms {
 		doorways := make([]Point, 0)
 
-		// Check Top & Bottom walls
-		for x := room.X1 + 1; x < room.X2; x++ {
-			// Top entry
-			if dungeon.InBounds(x, room.Y1) && dungeon.Tiles[x][room.Y1].Type == TileFloor {
+		for x := room.X1; x <= room.X2; x++ {
+			if dungeon.IsValidChokePoint(x, room.Y1) {
 				doorways = append(doorways, Point{X: x, Y: room.Y1})
 			}
-			// Bottom entry
-			if dungeon.InBounds(x, room.Y2) && dungeon.Tiles[x][room.Y2].Type == TileFloor {
+			if dungeon.IsValidChokePoint(x, room.Y2) {
 				doorways = append(doorways, Point{X: x, Y: room.Y2})
 			}
 		}
 
-		// Check Left & Right walls
 		for y := room.Y1 + 1; y < room.Y2; y++ {
-			// Left entry
-			if dungeon.InBounds(room.X1, y) && dungeon.Tiles[room.X1][y].Type == TileFloor {
+			if dungeon.IsValidChokePoint(room.X1, y) {
 				doorways = append(doorways, Point{X: room.X1, Y: y})
 			}
-			// Right entry
-			if dungeon.InBounds(room.X2, y) && dungeon.Tiles[room.X2][y].Type == TileFloor {
+			if dungeon.IsValidChokePoint(room.X2, y) {
 				doorways = append(doorways, Point{X: room.X2, Y: y})
 			}
 		}
