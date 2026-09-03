@@ -33,25 +33,27 @@ type BattleMessage struct {
 }
 
 type Battle struct {
-	Player       *entities.Player
-	Monster      *entities.Monster
-	RNG          *rand.Rand
-	SubMenu      BattleSubMenu
-	Result       BattleResult
-	Log          []BattleMessage
-	LevelUpMsgs  []string
-	SelectedSlot int
+	Player            *entities.Player
+	Monster           *entities.Monster
+	RNG               *rand.Rand
+	SubMenu           BattleSubMenu
+	Result            BattleResult
+	Log               []BattleMessage
+	LevelUpMsgs       []string
+	SelectedSlot      int
+	TelegraphedAction *entities.MonsterAction
 }
 
 func NewBattle(player *entities.Player, monster *entities.Monster, rng *rand.Rand) *Battle {
 	b := &Battle{
-		Player:       player,
-		Monster:      monster,
-		RNG:          rng,
-		SubMenu:      MenuMain,
-		Result:       BattleOngoing,
-		Log:          make([]BattleMessage, 0),
-		SelectedSlot: 0,
+		Player:            player,
+		Monster:           monster,
+		RNG:               rng,
+		SubMenu:           MenuMain,
+		Result:            BattleOngoing,
+		Log:               make([]BattleMessage, 0),
+		SelectedSlot:      0,
+		TelegraphedAction: nil,
 	}
 
 	b.AddLog(fmt.Sprintf("⚔️ Engaged in combat with %s!", monster.Name), tcell.ColorGold)
@@ -128,7 +130,7 @@ func (b *Battle) PlayerUseSkill(skillIdx int) {
 
 	case "shield_guard":
 		b.Player.Guarding = true
-		b.AddLog("🛡️ Shield Stance! You brace yourself, reducing next damage taken by 70%.", tcell.ColorSkyblue)
+		b.AddLog("🛡️ Shield Stance! You brace yourself, reducing next incoming damage by 70%.", tcell.ColorSkyblue)
 
 	case "holy_heal":
 		healed := b.Player.Heal(30)
@@ -173,6 +175,11 @@ func (b *Battle) PlayerFlee() {
 		return
 	}
 
+	if b.Monster.IsMerchant {
+		b.AddLog("The Shopkeeper has locked the doors! Fight or perish!", tcell.ColorRed)
+		return
+	}
+
 	// 75% escape chance
 	if b.RNG.Intn(100) < 75 {
 		b.AddLog("💨 You successfully fled from battle!", tcell.ColorYellow)
@@ -184,16 +191,36 @@ func (b *Battle) PlayerFlee() {
 	b.EnemyTurn()
 }
 
-// EnemyTurn processes tactical monster turn
+// EnemyTurn processes tactical monster turn with attack telegraphs
 func (b *Battle) EnemyTurn() {
 	if b.Monster.HP <= 0 {
 		return
 	}
 
-	// Select Monster action
-	action := b.Monster.Actions[0]
-	if len(b.Monster.Actions) > 1 {
-		action = b.Monster.Actions[b.RNG.Intn(len(b.Monster.Actions))]
+	var action entities.MonsterAction
+	isTelegraphedExecution := false
+
+	// Check if executing a previously telegraphed heavy attack
+	if b.TelegraphedAction != nil {
+		action = *b.TelegraphedAction
+		b.TelegraphedAction = nil
+		isTelegraphedExecution = true
+	} else {
+		// Pick action
+		picked := b.Monster.Actions[0]
+		if len(b.Monster.Actions) > 1 {
+			picked = b.Monster.Actions[b.RNG.Intn(len(b.Monster.Actions))]
+		}
+
+		// Check if this action should be telegraphed 1 turn ahead
+		if picked.IsTelegraphed && b.RNG.Intn(100) < 65 {
+			b.TelegraphedAction = &picked
+			warningMsg := fmt.Sprintf("⚠️ WARNING: %s %s (Shield Guard next turn!)", b.Monster.Name, picked.TelegraphWarning)
+			b.AddLog(warningMsg, tcell.ColorOrangeRed)
+			return // Monster spends this turn charging
+		}
+
+		action = picked
 	}
 
 	// Calculate damage
@@ -201,7 +228,7 @@ func (b *Battle) EnemyTurn() {
 	var finalDmg int
 
 	if action.IsMagic {
-		finalDmg = int(rawDmg) // Magic ignores DEF
+		finalDmg = int(rawDmg)
 	} else {
 		finalDmg = int(rawDmg) - b.Player.TotalDEF()
 	}
@@ -214,10 +241,10 @@ func (b *Battle) EnemyTurn() {
 	if b.Monster.IsChampion {
 		switch b.Monster.Affix {
 		case "[Fiery]":
-			finalDmg += 3
-			b.AddLog("🔥 Fiery Aura! Flames scorch you for +3 bonus damage!", tcell.ColorOrangeRed)
+			finalDmg += 4
+			b.AddLog("🔥 Fiery Aura! Flames scorch you for +4 bonus damage!", tcell.ColorOrangeRed)
 		case "[Frenzied]":
-			finalDmg = int(float64(finalDmg) * 1.25)
+			finalDmg = int(float64(finalDmg) * 1.3)
 			b.AddLog("⚡ Frenzied Rush! The champion attacks with blinding ferocity!", tcell.ColorMediumPurple)
 		}
 	}
@@ -229,9 +256,17 @@ func (b *Battle) EnemyTurn() {
 			finalDmg = 1
 		}
 		b.Player.Guarding = false
-		b.AddLog(fmt.Sprintf("🛡️ Your shield absorbed the blow! %s deals only %d damage with %s.", b.Monster.Name, finalDmg, action.Name), tcell.ColorSkyblue)
+		if isTelegraphedExecution {
+			b.AddLog(fmt.Sprintf("🛡️ PERFECT DEFLECTION! You shielded against %s's %s! (Took only %d damage)", b.Monster.Name, action.Name, finalDmg), tcell.ColorGreen)
+		} else {
+			b.AddLog(fmt.Sprintf("🛡️ Your shield absorbed the blow! %s deals only %d damage with %s.", b.Monster.Name, finalDmg, action.Name), tcell.ColorSkyblue)
+		}
 	} else {
-		b.AddLog(fmt.Sprintf("%s uses %s! %s (Deals %d damage)", b.Monster.Name, action.Name, action.Description, finalDmg), tcell.ColorRed)
+		if isTelegraphedExecution {
+			b.AddLog(fmt.Sprintf("💥 DIRECT HIT! %s unleashes %s! (Heavy %d damage!)", b.Monster.Name, action.Name, finalDmg), tcell.ColorRed)
+		} else {
+			b.AddLog(fmt.Sprintf("%s uses %s! %s (Deals %d damage)", b.Monster.Name, action.Name, action.Description, finalDmg), tcell.ColorRed)
+		}
 	}
 
 	// Vampiric Lifesteal

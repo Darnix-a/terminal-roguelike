@@ -44,10 +44,15 @@ func RenderBattleScreen(screen tcell.Screen, battle *combat.Battle) {
 	}
 	DrawText(screen, (sw-len(mHPStr))/2, monsterInfoY+1, tcell.StyleDefault.Foreground(mHPColor).Bold(true), mHPStr)
 
-	// Divider
+	// Divider / Telegraph Warning
 	divY := monsterInfoY + 3
-	for x := 1; x < sw-1; x++ {
-		screen.SetContent(x, divY, '─', nil, tcell.StyleDefault.Foreground(tcell.ColorDarkGray))
+	if battle.TelegraphedAction != nil {
+		warnText := fmt.Sprintf(" ⚠️ CHARGING: %s - USE SHIELD GUARD! ⚠️ ", strings.ToUpper(battle.TelegraphedAction.Name))
+		DrawText(screen, (sw-len(warnText))/2, divY, tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true), warnText)
+	} else {
+		for x := 1; x < sw-1; x++ {
+			screen.SetContent(x, divY, '─', nil, tcell.StyleDefault.Foreground(tcell.ColorDarkGray))
+		}
 	}
 
 	// 2. Center Section: Battle Action Log

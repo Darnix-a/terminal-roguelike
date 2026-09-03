@@ -18,6 +18,7 @@ type GameState int
 const (
 	StatePlaying GameState = iota
 	StateInventory
+	StateShop
 	StateCombat
 	StateGameOver
 	StateVictory
@@ -39,6 +40,7 @@ type Game struct {
 	MapW             int
 	MapH             int
 	ActiveBattle     *combat.Battle
+	ActiveMerchant   *entities.Monster
 	LastPlayerX      int
 	LastPlayerY      int
 	TutorialTriggers map[string]bool
@@ -75,9 +77,10 @@ func (g *Game) generateFloor(floor int) {
 	g.Floor = floor
 	g.Monsters = make([]*entities.Monster, 0)
 	g.Items = make([]*items.Item, 0)
+	g.ActiveMerchant = nil
 
 	if floor == 0 {
-		// Handcrafted Dynamic Tutorial Floor
+		// Handcrafted Tutorial Floor
 		g.Map = mapgen.GenerateTutorial(g.MapW, g.MapH)
 
 		if g.Player == nil {
@@ -125,20 +128,18 @@ func (g *Game) generateFloor(floor int) {
 			g.Log.Add("WARNING: THE ANCIENT RED DRAGON LAIRS ON THIS FLOOR!", tcell.ColorRed)
 		}
 
-		// Designate 1 room as a Locked Vault on Floors 1-5
 		vaultRoomIdx := -1
+		shopRoomIdx := -1
+
+		// Room 1: Locked Vault
 		if len(g.Map.Rooms) > 3 {
-			vaultRoomIdx = g.RNG.Intn(len(g.Map.Rooms)-2) + 1
+			vaultRoomIdx = 1
 			vRoom := g.Map.Rooms[vaultRoomIdx]
 			vx, vy := vRoom.Center()
 
-			// Place a Locked Door '%' at entrance
 			g.Map.Tiles[vRoom.X1][vy] = mapgen.NewDoorLocked()
-
-			// Place 1-2 Treasure Chests inside Vault
 			g.Map.Tiles[vx][vy] = mapgen.NewChest()
 
-			// Place a Fountain or Shrine inside Vault
 			if g.RNG.Intn(2) == 0 {
 				g.Map.Tiles[vx+1][vy] = mapgen.NewFountain()
 			} else {
@@ -146,18 +147,48 @@ func (g *Game) generateFloor(floor int) {
 			}
 		}
 
-		// Place 1 Key 'k' in another room
+		// Room 2: Dungeon Shop on Floors 2 and 4
+		if (floor == 2 || floor == 4) && len(g.Map.Rooms) > 4 {
+			shopRoomIdx = 2
+			sRoom := g.Map.Rooms[shopRoomIdx]
+			sx, sy := sRoom.Center()
+
+			merchant := entities.NewEntity("merchant", "Wandering Merchant", 'S', tcell.ColorGold, sx, sy, true)
+			merchantMonster := &entities.Monster{
+				Entity:     merchant,
+				HP:         85,
+				MaxHP:      85,
+				ATK:        19,
+				DEF:        6,
+				EXP:        250,
+				IsMerchant: true,
+				Alerted:    false,
+				Sprite: []string{
+					`  [$$__$$]  `,
+					`  /|====|\  `,
+					`   | || |   `,
+				},
+				Actions: []entities.MonsterAction{
+					{Name: "Ledger Strike", DamageMult: 1.2, Description: "slams you with a heavy gilded accounting tome"},
+					{Name: "Coin Gatling", DamageMult: 2.2, IsTelegraphed: true, TelegraphWarning: "loads a sack of pure gold coins for a COIN GATLING assault!", Description: "unleashes a relentless flurry of hypersonic golden coins"},
+				},
+			}
+			g.Monsters = append(g.Monsters, merchantMonster)
+			g.ActiveMerchant = merchantMonster
+		}
+
+		// Place 1 Key 'k' in a non-vault room
 		keyPlaced := false
 
 		for i, room := range g.Map.Rooms {
 			if i == 0 {
-				continue
+				continue // Skip spawn room
 			}
 
 			cx, cy := room.Center()
 
 			// Place Key
-			if !keyPlaced && i != vaultRoomIdx {
+			if !keyPlaced && i != vaultRoomIdx && i != shopRoomIdx {
 				g.Items = append(g.Items, items.NewDungeonKey(cx, cy))
 				keyPlaced = true
 				continue
@@ -170,8 +201,8 @@ func (g *Game) generateFloor(floor int) {
 				continue
 			}
 
-			// Don't spawn normal monsters inside the locked vault
-			if i == vaultRoomIdx {
+			// Don't spawn monsters inside vault or shop
+			if i == vaultRoomIdx || i == shopRoomIdx {
 				continue
 			}
 
@@ -180,7 +211,7 @@ func (g *Game) generateFloor(floor int) {
 				g.Map.Tiles[cx][cy] = mapgen.NewChest()
 			}
 
-			// 15% Chance to place a Healing Fountain or Shrine outside vault
+			// 15% Chance to place a Fountain or Shrine
 			if g.RNG.Intn(100) < 15 {
 				if g.RNG.Intn(2) == 0 {
 					g.Map.Tiles[cx][cy] = mapgen.NewFountain()
@@ -259,7 +290,7 @@ func (g *Game) StartBattle(monster *entities.Monster) {
 
 func (g *Game) alertNearbyMonsters(x, y int, radius float64) {
 	for _, m := range g.Monsters {
-		if m.IsAlive && !m.Alerted {
+		if m.IsAlive && !m.Alerted && !m.IsMerchant {
 			if entities.Distance(x, y, m.X, m.Y) <= radius {
 				m.Alerted = true
 			}
@@ -286,6 +317,9 @@ func (g *Game) ConcludeBattle() {
 		goldReward := g.RNG.Intn(15*g.Floor+1) + 10
 		if monster.IsChampion {
 			goldReward *= 2
+		} else if monster.IsMerchant {
+			goldReward = 150
+			g.Log.Add("Looted the Merchant's Heavy Vault Sack (+150 Gold)!", tcell.ColorGold)
 		}
 		g.Player.Gold += goldReward
 		g.Log.Add(fmt.Sprintf("Looted %d Gold Coins from %s.", goldReward, monster.Name), tcell.ColorYellow)
@@ -311,6 +345,66 @@ func (g *Game) ConcludeBattle() {
 	g.Map.ComputeFOV(g.Player.X, g.Player.Y, g.FOVRadius)
 }
 
+// BuyShopItem handles purchasing wares from Merchant
+func (g *Game) BuyShopItem(slot int) {
+	switch slot {
+	case 1: // Health Potion (20 Gold)
+		if g.Player.Gold >= 20 {
+			g.Player.Gold -= 20
+			_ = g.Player.Inventory.Add(items.NewHealthPotion(0, 0))
+			g.Log.Add("Bought Health Potion (+25 HP) for 20 Gold!", tcell.ColorGreen)
+		} else {
+			g.Log.Add("Not enough gold to buy Health Potion!", tcell.ColorRed)
+		}
+	case 2: // Greater Health Draught (40 Gold)
+		if g.Player.Gold >= 40 {
+			g.Player.Gold -= 40
+			_ = g.Player.Inventory.Add(items.NewGreaterHealthPotion(0, 0))
+			g.Log.Add("Bought Greater Health Draught (+50 HP) for 40 Gold!", tcell.ColorGreen)
+		} else {
+			g.Log.Add("Not enough gold to buy Greater Health Draught!", tcell.ColorRed)
+		}
+	case 3: // Scroll of Weapon Enchantment (60 Gold)
+		if g.Player.Gold >= 60 {
+			g.Player.Gold -= 60
+			g.Player.BaseATK += 3
+			g.Log.Add("✨ Read Scroll of Weapon Enchantment (-60 Gold)! Permanently gained +3 Base ATK!", tcell.ColorGold)
+		} else {
+			g.Log.Add("Not enough gold to buy Scroll of Weapon Enchantment!", tcell.ColorRed)
+		}
+	case 4: // Dragonscale Shield (75 Gold)
+		if g.Player.Gold >= 75 {
+			g.Player.Gold -= 75
+			shield := &items.Item{
+				ID: "dragon_shield", Name: "Dragonscale Shield", Type: items.TypeArmor,
+				Rune: '[', Color: tcell.ColorGold, BonusDEF: 4, Description: "+4 Defense Shield",
+			}
+			_ = g.Player.Inventory.Add(shield)
+			g.Log.Add("Bought Dragonscale Shield (+4 DEF) for 75 Gold!", tcell.ColorLightCyan)
+		} else {
+			g.Log.Add("Not enough gold to buy Dragonscale Shield!", tcell.ColorRed)
+		}
+	case 5: // Scroll of Teleportation (30 Gold)
+		if g.Player.Gold >= 30 {
+			g.Player.Gold -= 30
+			_ = g.Player.Inventory.Add(items.NewScrollTeleport(0, 0))
+			g.Log.Add("Bought Scroll of Teleportation for 30 Gold!", tcell.ColorViolet)
+		} else {
+			g.Log.Add("Not enough gold to buy Scroll of Teleportation!", tcell.ColorRed)
+		}
+	}
+}
+
+// AttackMerchant provokes the shopkeeper into combat
+func (g *Game) AttackMerchant() {
+	if g.ActiveMerchant == nil {
+		g.State = StatePlaying
+		return
+	}
+	g.Log.Add("⚠️ YOU ATTACKED THE SHOPKEEPER! Prepare for his wrath!", tcell.ColorRed)
+	g.StartBattle(g.ActiveMerchant)
+}
+
 // HandlePlayerAction handles exploration, interactions, and combat
 func (g *Game) HandlePlayerAction(dx, dy int) {
 	if g.State != StatePlaying {
@@ -324,9 +418,14 @@ func (g *Game) HandlePlayerAction(dx, dy int) {
 		return
 	}
 
-	// 1. Check for Monster -> Trigger Battle!
+	// 1. Check for Monster / Merchant
 	targetMonster := g.getMonsterAt(destX, destY)
 	if targetMonster != nil {
+		if targetMonster.IsMerchant {
+			g.ActiveMerchant = targetMonster
+			g.State = StateShop
+			return
+		}
 		g.StartBattle(targetMonster)
 		return
 	}
@@ -483,8 +582,8 @@ func (g *Game) EndPlayerTurn() {
 
 	// Process Monster AI movement on map
 	for _, m := range g.Monsters {
-		if !m.IsAlive {
-			continue
+		if !m.IsAlive || m.IsMerchant {
+			continue // Merchant stays peaceful in shop
 		}
 
 		distToPlayer := entities.Distance(m.X, m.Y, g.Player.X, g.Player.Y)
@@ -582,6 +681,11 @@ func (g *Game) UseInventoryItem(index int) {
 			}
 			_, _ = g.Player.Inventory.Remove(index)
 			g.EndPlayerTurn()
+		} else if item.ID == "scroll_enchant" {
+			g.Player.BaseATK += 3
+			g.Log.Add("✨ Read Scroll of Weapon Enchantment! Permanently gained +3 Base ATK!", tcell.ColorGold)
+			_, _ = g.Player.Inventory.Remove(index)
+			g.EndPlayerTurn()
 		}
 
 	case items.TypeWeapon, items.TypeArmor:
@@ -624,7 +728,7 @@ func (g *Game) DescendStairs() {
 	if g.Floor == 0 {
 		g.Log.Add("Training Complete! Descending into Dungeon Floor 1...", tcell.ColorGold)
 		g.Log.Add("Tutorial items cleared. Entering the dungeon with starter loadout!", tcell.ColorYellow)
-		g.Player = nil // Creates clean fresh player for Floor 1
+		g.Player = nil // Reset inventory & stats on entry to Floor 1
 	} else {
 		g.Log.Add(fmt.Sprintf("You descend the stairs into Floor %d...", nextFloor), tcell.ColorGold)
 	}

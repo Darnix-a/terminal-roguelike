@@ -271,12 +271,15 @@ func Render(screen tcell.Screen, g *engine.Game) {
 	DrawText(screen, sideX+12, 27, tcell.StyleDefault.Foreground(tcell.ColorOlive), "o Orc")
 	DrawText(screen, sideX+2, 28, tcell.StyleDefault.Foreground(tcell.ColorWhite), "s Skele")
 	DrawText(screen, sideX+12, 28, tcell.StyleDefault.Foreground(tcell.ColorPurple), "w Wizard")
-	DrawText(screen, sideX+2, 29, tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true), "D Dragon Boss (Floor 5)")
+	DrawText(screen, sideX+2, 29, tcell.StyleDefault.Foreground(tcell.ColorGold).Bold(true), "S Shop")
+	DrawText(screen, sideX+12, 29, tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true), "D Dragon")
 
 	// 8. Modals
 	switch g.State {
 	case engine.StateInventory:
 		RenderInventoryModal(screen, g)
+	case engine.StateShop:
+		RenderShopModal(screen, g)
 	case engine.StateGameOver:
 		RenderGameOverModal(screen, g)
 	case engine.StateVictory:

@@ -8,10 +8,12 @@ import (
 )
 
 type MonsterAction struct {
-	Name        string
-	DamageMult  float64
-	IsMagic     bool
-	Description string
+	Name             string
+	DamageMult       float64
+	IsMagic          bool
+	IsTelegraphed    bool
+	TelegraphWarning string
+	Description      string
 }
 
 type Monster struct {
@@ -23,6 +25,7 @@ type Monster struct {
 	EXP        int
 	IsBoss     bool
 	IsChampion bool
+	IsMerchant bool
 	Affix      string
 	Alerted    bool
 	Guarding   bool
@@ -64,7 +67,7 @@ func NewSkeleton(x, y int) *Monster {
 	actions := []MonsterAction{
 		{Name: "Rusty Blade", DamageMult: 1.1, Description: "swings an ancient rusted blade"},
 		{Name: "Shield Bash", DamageMult: 1.4, Description: "bashes hard with a spiked iron shield"},
-		{Name: "Cursed Cleave", DamageMult: 1.6, Description: "channels necrotic energy into a brutal strike"},
+		{Name: "Cursed Cleave", DamageMult: 1.7, IsTelegraphed: true, TelegraphWarning: "channels dark necrotic runes into its blade for a CURSED CLEAVE!", Description: "unleashes a brutal necrotic strike"},
 	}
 	return &Monster{
 		Entity:   NewEntity("skeleton", "Skeletal Guard", 's', tcell.ColorWhite, x, y, true),
@@ -88,8 +91,8 @@ func NewOrc(x, y int) *Monster {
 	}
 	actions := []MonsterAction{
 		{Name: "Heavy Cleave", DamageMult: 1.3, Description: "swings a giant battleaxe with crushing power"},
-		{Name: "Skull Crusher", DamageMult: 1.7, Description: "leaps into the air and smashes your helm"},
-		{Name: "Bloodrage Frenzy", DamageMult: 2.0, Description: "unleashes a devastating berserker combo"},
+		{Name: "Skull Crusher", DamageMult: 2.2, IsTelegraphed: true, TelegraphWarning: "raises his colossal battleaxe overhead for a devastating SKULL CRUSHER!", Description: "leaps into the air and delivers a bone-shattering smash"},
+		{Name: "Bloodrage Frenzy", DamageMult: 1.8, Description: "unleashes a bloodthirsty berserker combo"},
 	}
 	return &Monster{
 		Entity:   NewEntity("orc", "Orc Berserker", 'o', tcell.ColorOlive, x, y, true),
@@ -115,7 +118,7 @@ func NewDarkWizard(x, y int) *Monster {
 	actions := []MonsterAction{
 		{Name: "Shadow Bolt", DamageMult: 1.4, IsMagic: true, Description: "casts a piercing bolt of dark void magic"},
 		{Name: "Life Siphon", DamageMult: 1.2, IsMagic: true, Description: "drains vitality directly from your soul"},
-		{Name: "Hellfire Hex", DamageMult: 1.8, IsMagic: true, Description: "erupts the ground in cursed black flames"},
+		{Name: "Hellfire Hex", DamageMult: 2.3, IsMagic: true, IsTelegraphed: true, TelegraphWarning: "begins chanting ancient incantations... HELLFIRE HEX is charging!", Description: "erupts the ground in catastrophic cursed black flames"},
 	}
 	return &Monster{
 		Entity:   NewEntity("dark_wizard", "Dark Sorcerer", 'w', tcell.ColorPurple, x, y, true),
@@ -141,7 +144,7 @@ func NewMimic(x, y int) *Monster {
 	actions := []MonsterAction{
 		{Name: "Chest Chomp", DamageMult: 1.5, Description: "snaps its razor-toothed wooden jaws"},
 		{Name: "Adhesive Lash", DamageMult: 1.3, Description: "whips with an adhesive sticky tongue"},
-		{Name: "Gold Shrapnel", DamageMult: 1.6, Description: "blasts jagged heavy metal coins at point-blank"},
+		{Name: "Gold Shrapnel", DamageMult: 2.0, IsTelegraphed: true, TelegraphWarning: "swallows deep and prepares a burst of GOLD SHRAPNEL!", Description: "blasts jagged heavy metal coins at point-blank"},
 	}
 	return &Monster{
 		Entity:   NewEntity("mimic", "Hungry Mimic", 'M', tcell.ColorGold, x, y, true),
@@ -151,6 +154,32 @@ func NewMimic(x, y int) *Monster {
 		DEF:      5,
 		EXP:      90,
 		IsBoss:   false,
+		Alerted:  true,
+		Sprite:   sprite,
+		Actions:  actions,
+	}
+}
+
+func NewEnragedShopkeeper(x, y int) *Monster {
+	sprite := []string{
+		`  [$$__$$]  `,
+		`  /|====|\  `,
+		`   | || |   `,
+	}
+	actions := []MonsterAction{
+		{Name: "Ledger Strike", DamageMult: 1.2, Description: "slams you with a heavy gilded accounting tome"},
+		{Name: "Coin Gatling", DamageMult: 2.2, IsTelegraphed: true, TelegraphWarning: "loads a sack of pure gold coins for a COIN GATLING assault!", Description: "unleashes a relentless flurry of hypersonic golden coins"},
+		{Name: "Vault Cleave", DamageMult: 1.6, Description: "swings an enchanted vault crowbar"},
+	}
+	return &Monster{
+		Entity:   NewEntity("shopkeeper_boss", "Enraged Shopkeeper", 'S', tcell.ColorGold, x, y, true),
+		HP:       85,
+		MaxHP:    85,
+		ATK:      19,
+		DEF:      6,
+		EXP:      250,
+		IsBoss:   false,
+		IsMerchant: true,
 		Alerted:  true,
 		Sprite:   sprite,
 		Actions:  actions,
@@ -167,10 +196,10 @@ func NewDragonBoss(x, y int) *Monster {
 		`    /    \    `,
 	}
 	actions := []MonsterAction{
-		{Name: "Inferno Breath", DamageMult: 1.8, IsMagic: true, Description: "breathes a catastrophic cone of dragon fire"},
-		{Name: "Tail Slam", DamageMult: 1.5, Description: "whips its colossal spiked tail against you"},
 		{Name: "Dragon Claws", DamageMult: 1.4, Description: "rakes with razor-sharp fiery claws"},
-		{Name: "Cataclysm Roar", DamageMult: 2.0, Description: "unleashes a roar of pure annihilation"},
+		{Name: "Tail Slam", DamageMult: 1.5, Description: "whips its colossal spiked tail against you"},
+		{Name: "Inferno Breath", DamageMult: 2.5, IsMagic: true, IsTelegraphed: true, TelegraphWarning: "takes a massive breath, glowing with searing infernal MAGMA!", Description: "breathes a catastrophic inferno across the arena"},
+		{Name: "Cataclysm Roar", DamageMult: 2.2, IsTelegraphed: true, TelegraphWarning: "rears back to unleash a world-shattering CATACLYSM ROAR!", Description: "unleashes a roar of pure annihilation"},
 	}
 	return &Monster{
 		Entity:   NewEntity("dragon_boss", "Ancient Red Dragon", 'D', tcell.ColorRed, x, y, true),

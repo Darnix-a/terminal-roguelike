@@ -142,6 +142,22 @@ func main() {
 					}
 					game.State = engine.StatePlaying
 				}
+			case engine.StateShop:
+				if ev.Key() == tcell.KeyEscape || ev.Rune() == 'q' || ev.Rune() == 'Q' {
+					game.State = engine.StatePlaying
+					continue
+				}
+
+				if ev.Rune() == 'a' || ev.Rune() == 'A' {
+					game.AttackMerchant()
+					continue
+				}
+
+				r := ev.Rune()
+				if r >= '1' && r <= '5' {
+					slotIdx := int(r - '0')
+					game.BuyShopItem(slotIdx)
+				}
 
 			case engine.StatePlaying:
 				switch ev.Key() {

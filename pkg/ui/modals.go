@@ -110,3 +110,33 @@ func RenderVictoryModal(screen tcell.Screen, g *engine.Game) {
 
 	DrawText(screen, x1+4, y2-2, tcell.StyleDefault.Foreground(tcell.ColorDarkGray), "Press [r] to Play Again or [q] to Quit")
 }
+
+// RenderShopModal renders the interactive dungeon merchant shop
+func RenderShopModal(screen tcell.Screen, g *engine.Game) {
+	sw, sh := screen.Size()
+	w, h := 56, 17
+	x1 := (sw - w) / 2
+	y1 := (sh - h) / 2
+	x2 := x1 + w
+	y2 := y1 + h
+
+	for x := x1; x <= x2; x++ {
+		for y := y1; y <= y2; y++ {
+			screen.SetContent(x, y, ' ', nil, tcell.StyleDefault.Background(tcell.ColorBlack))
+		}
+	}
+
+	title := fmt.Sprintf("DUNGEON MERCHANT (Your Gold: %d)", g.Player.Gold)
+	DrawBox(screen, x1, y1, x2, y2, tcell.StyleDefault.Foreground(tcell.ColorGold).Bold(true), title)
+
+	DrawText(screen, x1+3, y1+2, tcell.StyleDefault.Foreground(tcell.ColorYellow), "\"Welcome, traveler! Spend your gold on fine dungeon wares!\"")
+
+	DrawText(screen, x1+3, y1+4, tcell.StyleDefault.Foreground(tcell.ColorLightCoral), "[1] Health Potion (+25 HP)              -  20 Gold")
+	DrawText(screen, x1+3, y1+5, tcell.StyleDefault.Foreground(tcell.ColorRed), "[2] Greater Health Draught (+50 HP)     -  40 Gold")
+	DrawText(screen, x1+3, y1+6, tcell.StyleDefault.Foreground(tcell.ColorGold), "[3] Scroll of Weapon Enchant (+3 ATK)   -  60 Gold")
+	DrawText(screen, x1+3, y1+7, tcell.StyleDefault.Foreground(tcell.ColorSilver), "[4] Dragonscale Shield (+4 DEF)         -  75 Gold")
+	DrawText(screen, x1+3, y1+8, tcell.StyleDefault.Foreground(tcell.ColorViolet), "[5] Scroll of Teleportation             -  30 Gold")
+
+	DrawText(screen, x1+3, y1+11, tcell.StyleDefault.Foreground(tcell.ColorOrangeRed), "[A] Provoke / Attack the Merchant")
+	DrawText(screen, x1+3, y1+13, tcell.StyleDefault.Foreground(tcell.ColorYellow), "Press [1-5] to Buy | [A] Attack | [Esc/q] Leave Shop")
+}

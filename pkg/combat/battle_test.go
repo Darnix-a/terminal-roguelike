@@ -39,3 +39,31 @@ func TestTurnBasedBattle(t *testing.T) {
 		t.Errorf("Expected BattleVictory after goblin defeated, got %v", battle.Result)
 	}
 }
+
+func TestAttackTelegraphAndGuard(t *testing.T) {
+	rng := rand.New(rand.NewSource(100))
+	player := entities.NewPlayer(0, 0)
+	orc := entities.NewOrc(0, 0)
+
+	battle := NewBattle(player, orc, rng)
+
+	// Set a telegraphed action manually
+	telegraphedMove := orc.Actions[1] // Skull Crusher
+	battle.TelegraphedAction = &telegraphedMove
+
+	// Player guards
+	player.Guarding = true
+	initialHP := player.HP
+
+	battle.EnemyTurn()
+
+	// Should have executed the telegraphed move and mitigated 70% damage
+	if battle.TelegraphedAction != nil {
+		t.Errorf("Expected telegraphed action to be consumed, got %+v", battle.TelegraphedAction)
+	}
+
+	damageTaken := initialHP - player.HP
+	if damageTaken <= 0 {
+		t.Errorf("Expected some damage taken, got %d", damageTaken)
+	}
+}

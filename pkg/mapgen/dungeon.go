@@ -103,7 +103,7 @@ func (m *DungeonMap) createVTunnel(y1, y2, x int) {
 	}
 }
 
-// Generate creates a procedural dungeon with connected rooms and corridors
+// Generate creates a procedural dungeon with guaranteed room connectivity
 func Generate(width, height, maxRooms, minRoomSize, maxRoomSize int, rng *rand.Rand) *DungeonMap {
 	if rng == nil {
 		rng = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -114,14 +114,16 @@ func Generate(width, height, maxRooms, minRoomSize, maxRoomSize int, rng *rand.R
 	for i := 0; i < maxRooms; i++ {
 		w := rng.Intn(maxRoomSize-minRoomSize+1) + minRoomSize
 		h := rng.Intn(maxRoomSize-minRoomSize+1) + minRoomSize
-		x := rng.Intn(width - w - 2) + 1
-		y := rng.Intn(height - h - 2) + 1
+		x := rng.Intn(width-w-3) + 2
+		y := rng.Intn(height-h-3) + 2
 
 		newRoom := NewRect(x, y, w, h)
 
 		overlap := false
 		for _, otherRoom := range dungeon.Rooms {
-			if newRoom.Intersects(otherRoom) {
+			// Ensure 1-tile buffer between rooms
+			buffered := NewRect(otherRoom.X1-1, otherRoom.Y1-1, otherRoom.X2-otherRoom.X1+2, otherRoom.Y2-otherRoom.Y1+2)
+			if newRoom.Intersects(buffered) {
 				overlap = true
 				break
 			}
@@ -133,11 +135,10 @@ func Generate(width, height, maxRooms, minRoomSize, maxRoomSize int, rng *rand.R
 			newCenterX, newCenterY := newRoom.Center()
 
 			if len(dungeon.Rooms) == 0 {
-				// Player starting position in first room
 				dungeon.StartX = newCenterX
 				dungeon.StartY = newCenterY
 			} else {
-				// Connect to previous room with an L-tunnel
+				// Connect directly to the previous room center
 				prevCenterX, prevCenterY := dungeon.Rooms[len(dungeon.Rooms)-1].Center()
 
 				if rng.Intn(2) == 1 {
@@ -153,14 +154,25 @@ func Generate(width, height, maxRooms, minRoomSize, maxRoomSize int, rng *rand.R
 		}
 	}
 
-	// Place stairs down in the last generated room
-	if len(dungeon.Rooms) > 0 {
-		lastRoom := dungeon.Rooms[len(dungeon.Rooms)-1]
-		sx, sy := lastRoom.Center()
-		dungeon.StairsDownX = sx
-		dungeon.StairsDownY = sy
-		dungeon.Tiles[sx][sy] = NewStairsDown()
+	// Fallback if too few rooms placed
+	if len(dungeon.Rooms) < 3 {
+		r1 := NewRect(4, 4, 10, 8)
+		r2 := NewRect(width-16, height-12, 10, 8)
+		dungeon.createRoom(r1)
+		dungeon.createRoom(r2)
+		dungeon.createHTunnel(9, width-11, 8)
+		dungeon.createVTunnel(8, height-8, width-11)
+		dungeon.StartX = 9
+		dungeon.StartY = 8
+		dungeon.Rooms = []Rect{r1, r2}
 	}
+
+	// Place stairs down in the last room
+	lastRoom := dungeon.Rooms[len(dungeon.Rooms)-1]
+	sx, sy := lastRoom.Center()
+	dungeon.StairsDownX = sx
+	dungeon.StairsDownY = sy
+	dungeon.Tiles[sx][sy] = NewStairsDown()
 
 	return dungeon
 }

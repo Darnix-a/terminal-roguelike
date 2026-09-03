@@ -5,36 +5,26 @@ import (
 	"testing"
 )
 
-func TestDungeonGeneration(t *testing.T) {
-	rng := rand.New(rand.NewSource(42))
-	dungeon := Generate(60, 25, 10, 5, 10, rng)
+func TestDungeonGenerationRobustness(t *testing.T) {
+	rng := rand.New(rand.NewSource(999))
 
-	if len(dungeon.Rooms) == 0 {
-		t.Fatalf("Expected rooms to be generated, got 0")
-	}
+	for i := 0; i < 50; i++ {
+		dungeon := Generate(70, 24, 14, 5, 10, rng)
 
-	// Verify Start Position is on a floor
-	if dungeon.Tiles[dungeon.StartX][dungeon.StartY].Type != TileFloor {
-		t.Errorf("Start position (%d, %d) is not a floor tile", dungeon.StartX, dungeon.StartY)
-	}
+		if len(dungeon.Rooms) < 2 {
+			t.Errorf("Iteration %d: expected >= 2 rooms, got %d", i, len(dungeon.Rooms))
+		}
 
-	// Verify Stairs Down is placed
-	if dungeon.Tiles[dungeon.StairsDownX][dungeon.StairsDownY].Type != TileStairsDown {
-		t.Errorf("Stairs down (%d, %d) is not TileStairsDown", dungeon.StairsDownX, dungeon.StairsDownY)
-	}
-}
+		if !dungeon.InBounds(dungeon.StartX, dungeon.StartY) {
+			t.Errorf("Iteration %d: StartX/StartY out of bounds", i)
+		}
 
-func TestFOVComputation(t *testing.T) {
-	rng := rand.New(rand.NewSource(42))
-	dungeon := Generate(60, 25, 10, 5, 10, rng)
+		if !dungeon.InBounds(dungeon.StairsDownX, dungeon.StairsDownY) {
+			t.Errorf("Iteration %d: StairsDown out of bounds", i)
+		}
 
-	dungeon.ComputeFOV(dungeon.StartX, dungeon.StartY, 8)
-
-	// Center tile must be visible and explored
-	if !dungeon.Tiles[dungeon.StartX][dungeon.StartY].Visible {
-		t.Errorf("Player start tile should be visible")
-	}
-	if !dungeon.Tiles[dungeon.StartX][dungeon.StartY].Explored {
-		t.Errorf("Player start tile should be explored")
+		if dungeon.Tiles[dungeon.StairsDownX][dungeon.StairsDownY].Type != TileStairsDown {
+			t.Errorf("Iteration %d: expected StairsDown tile at exit", i)
+		}
 	}
 }

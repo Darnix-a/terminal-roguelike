@@ -198,3 +198,16 @@ func NewDungeonKey(x, y int) *Item {
 		Description: "Unlocks heavy iron vault doors",
 	}
 }
+
+func NewScrollEnchantment(x, y int) *Item {
+	return &Item{
+		ID:          "scroll_enchant",
+		Name:        "Scroll of Weapon Enchantment",
+		Type:        TypeScroll,
+		Rune:        '?',
+		Color:       tcell.ColorGold,
+		X:           x,
+		Y:           y,
+		Description: "Permanently infuses your hero with +3 Base ATK",
+	}
+}
