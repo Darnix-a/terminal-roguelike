@@ -38,8 +38,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 'stable'
-          cache: true
+          go-version: '1.24'
+          cache: false
+
+      - name: Tidy Dependencies
+        run: go mod tidy
 
       - name: Build Binary
         env:
@@ -53,7 +56,7 @@ jobs:
             EXT=".exe"
           fi
           BIN_NAME="roguelike-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
-          go build -ldflags="-s -w" -o "dist/${BIN_NAME}" ./cmd/roguelike
+          go build -buildvcs=false -ldflags="-s -w" -o "dist/${BIN_NAME}" ./cmd/roguelike
 
       - name: Package Archive
         run: |
